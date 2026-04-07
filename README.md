@@ -1,6 +1,8 @@
 <!-- Repository documentation: how to run Playwright, required environment variables, Allure. -->
 ## E2E-Playwright
 
+**Публикация на GitHub:** см. [docs/GITHUB.md](docs/GITHUB.md) (HTTPS, без SSH на первом шаге).
+
 ### PET app (local UI stub)
 
 The `pet-app/` folder is a minimal Vite + React + Ant Design UI plus an in-dev `POST /api/graphql` handler so you can run the suite without a real backend. **GraphQL SDL (intended API contract):** `pet-app/graphql/schema.graphql`. See `pet-app/README.md`, copy `pet-app/.env.example` to `pet-app/.env`, align the repo root `.env` with `pet-app/README.md`, copy `pet-app/e2e-fixtures.sample.json` to `tests/logistics/fixtures.local.json`, then `npm run pet:dev` in one terminal and Playwright in another.
