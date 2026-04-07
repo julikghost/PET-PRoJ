@@ -1,0 +1,141 @@
+"""
+PET logistics — GraphQL contract aligned with the PET UI data model.
+
+- Operational data (points → pet ships → bookings) is persisted in the browser
+  (`localStorage`, see `PetLogisticsContext`) in the demo app; a production API
+  would implement these types.
+- Reports email mutation matches `ReportsPage` and the Playwright Reports flow.
+"""
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+# --- Read models ---
+
+type Query {
+  """Health / portfolio stub."""
+  _petHealth: String!
+  points: [NetworkPoint!]!
+  petShips: [PetShip!]!
+  bookings: [PetBooking!]!
+  petShip(id: ID!): PetShip
+  networkPoint(id: ID!): NetworkPoint
+}
+
+type NetworkPoint {
+  id: ID!
+  code: String!
+  name: String!
+  city: String!
+  kind: NetworkPointKind!
+}
+
+enum NetworkPointKind {
+  HUB
+  STOP
+  AIRPORT
+}
+
+type PetShip {
+  id: ID!
+  refCode: String!
+  fromPoint: NetworkPoint!
+  toPoint: NetworkPoint!
+  departure: String!
+  arrival: String!
+  petMover: String!
+  status: PetShipStatus!
+}
+
+enum PetShipStatus {
+  PLANNED
+  ACTIVE
+  DONE
+}
+
+type PetBooking {
+  id: ID!
+  refCode: String!
+  petShip: PetShip!
+  date: String!
+  petLabel: String!
+  weightKg: Float!
+}
+
+# --- Writes (intended backend shape) ---
+
+type Mutation {
+  emailTicketsReport(req: EmailTicketsReportReq!): EmailTicketsReportPayload!
+
+  createNetworkPoint(input: NetworkPointInput!): NetworkPointMutationPayload!
+  updateNetworkPoint(id: ID!, input: NetworkPointInput!): NetworkPointMutationPayload!
+  deleteNetworkPoint(id: ID!): NetworkPointMutationPayload!
+
+  createPetShip(input: PetShipInput!): PetShipMutationPayload!
+  updatePetShip(id: ID!, input: PetShipInput!): PetShipMutationPayload!
+  deletePetShip(id: ID!): PetShipMutationPayload!
+
+  createPetBooking(input: PetBookingInput!): PetBookingMutationPayload!
+  updatePetBooking(id: ID!, input: PetBookingInput!): PetBookingMutationPayload!
+  deletePetBooking(id: ID!): PetBookingMutationPayload!
+}
+
+input NetworkPointInput {
+  code: String!
+  name: String!
+  city: String!
+  kind: NetworkPointKind!
+}
+
+input PetShipInput {
+  refCode: String!
+  fromPointId: ID!
+  toPointId: ID!
+  departure: String!
+  arrival: String!
+  petMover: String!
+  status: PetShipStatus!
+}
+
+input PetBookingInput {
+  refCode: String!
+  petShipId: ID!
+  date: String!
+  petLabel: String!
+  weightKg: Float!
+}
+
+type NetworkPointMutationPayload {
+  ok: Boolean!
+  point: NetworkPoint
+  error: String
+}
+
+type PetShipMutationPayload {
+  ok: Boolean!
+  petShip: PetShip
+  error: String
+}
+
+type PetBookingMutationPayload {
+  ok: Boolean!
+  booking: PetBooking
+  error: String
+}
+
+# --- Reports (existing) ---
+
+input EmailTicketsReportReq {
+  paymentType: [String!]
+  targetColumnForDateSearch: String!
+  fromDate: String!
+  toDate: String!
+  carrierIds: [ID!]!
+  emailForSendReport: String!
+  currency: [String!]
+}
+
+type EmailTicketsReportPayload {
+  ok: Boolean!
+}

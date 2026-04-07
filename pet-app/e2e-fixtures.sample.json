@@ -1,0 +1,29 @@
+{
+  "_comment": "Copy to repo root tests/logistics/fixtures.local.json when running e2e against PET defaults. Use E2E_TIME_ZONE=UTC for stable date assertions.",
+  "reportCarrier": "PetMover",
+  "uiPaymentMethods": ["Card", "Cash", "PetPay"],
+  "uiCurrencies": ["USD", "EUR"],
+  "paymentCodeToName": {
+    "card": "Card",
+    "cash": "Cash",
+    "petpay": "PetPay"
+  },
+  "currencyIdToName": {
+    "cur-usd": "USD",
+    "cur-eur": "EUR"
+  },
+  "carrierIdsExpected": ["carrier-pet-1"],
+  "graphql": {
+    "operationName": "EmailTicketsReport",
+    "queryContains": "EmailTicketsReport",
+    "variables": {
+      "req": {
+        "paymentTypeNames": ["Card", "Cash", "PetPay"],
+        "targetColumnForDateSearch": "departureDate",
+        "fromDateDay": "CURRENT_MONTH_START",
+        "toDateDay": "CURRENT_MONTH_END",
+        "currencyNames": ["USD", "EUR"]
+      }
+    }
+  }
+}

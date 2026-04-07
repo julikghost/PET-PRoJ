@@ -1,0 +1,195 @@
+/**
+ * Reports E2E: filters, send-by-email, assertions on intercepted GraphQL body
+ * and response files using external fixtures (sensitive data not in the repo).
+ *
+ * Structure:
+ * 1. Module scope — load fixtures + compute current-month date range for the date picker.
+ * 2. `test.describe('Reports')` — skipped entirely when fixtures are missing.
+ * 3. Single test — UI flow → `sendByEmail()` capture → optional file/response checks → deep GraphQL `variables.req` assertions.
+ */
+import * as fs from 'fs';
+import { test, expect } from '@playwright/test';
+import { MENU_ITEM } from '../../utils/constants';
+import { config } from '../../config-logistics';
+import { LogisticsApp } from '../../pageObjects/LogisticsApp';
+import type { EmailSendCapture } from '../../pageObjects/Reports';
+import { reports } from '../../utils/text';
+import { getCurrentMonthRangeDays, getCurrentMonthRangeDaysUTC } from '../../utils/date';
+import {
+    loadLogisticsReportFixtures,
+    type LogisticsReportGraphqlExpected,
+    type LogisticsReportFixtures
+} from './reportFixtures';
+
+// --- Module-level inputs (env + external fixtures) ---
+const { uiUsername } = config;
+
+const fixtures: LogisticsReportFixtures | null = loadLogisticsReportFixtures();
+
+// Calendar range shown in the UI date filter (local) and expected ISO date substrings in GraphQL (UTC helpers).
+const { startDay: currentMonthStart, endDay: currentMonthEnd } = getCurrentMonthRangeDays();
+const { startDayUTC: currentMonthStartUTC, endDayUTC: currentMonthEndUTC } = getCurrentMonthRangeDaysUTC();
+const startDate = currentMonthStart;
+const endDate = currentMonthEnd;
+
+// --- Shapes for parsing the persisted GraphQL request body (see `emailSend.requestJsonPath`) ---
+interface TicketReportRequestVars {
+    paymentType?: string[];
+    targetColumnForDateSearch?: string;
+    fromDate?: string;
+    toDate?: string;
+    carrierIds?: string[];
+    carrierId?: string;
+    emailForSendReport?: string;
+    currency?: string[];
+}
+
+interface GraphqlRequestBody {
+    operationName?: string;
+    query?: string;
+    variables?: { req?: TicketReportRequestVars };
+}
+
+test.describe('Reports', () => {
+    // No suite runs without fixture data (keeps NDA payloads out of git).
+    test.skip(
+        !fixtures,
+        'NDA: add tests/logistics/fixtures.local.json (see fixtures.example.json) or LOGISTICS_REPORT_FIXTURES_JSON'
+    );
+
+    test('Send report by email with updated filters', async ({ page }) => {
+        test.skip(
+            (!config.accountantUsername || !config.accountantPassword)
+            && (!config.adminUsername || !config.adminPassword),
+            'Set LOGISTICS_ACCOUNTANT_* or LOGISTICS_ADMIN_* for PET Reports (PetUser cannot open Reports).'
+        );
+
+        // --- Fixture unpack: labels, id maps, and expected GraphQL fragment ---
+        const fx = fixtures as LogisticsReportFixtures;
+        const {
+            reportCarrier,
+            uiPaymentMethods,
+            uiCurrencies,
+            paymentCodeToName,
+            currencyIdToName,
+            carrierIdsExpected = [],
+            graphql: expectedRequest
+        } = fx;
+
+        // --- Act: open app, Reports, apply filters from fixtures, submit “send by email” (intercepts POST + writes artifacts) ---
+        const app = new LogisticsApp(page);
+        await app.openLogisticsApp();
+        await app.loginForReportsAccess();
+        await app.navigationSidebar.clickMenuItem(MENU_ITEM.REPORTS);
+        await app.reports.field.selectOptions({ name: reports.carrier, options: reportCarrier });
+        await app.reports.field.fillDateRange({ name: reports.dateRange, startDate, endDate });
+        await app.reports.field.selectOptions({ name: reports.paymentType, options: uiPaymentMethods });
+        await app.reports.field.selectOptions({ name: reports.currency, options: uiCurrencies });
+
+        const emailSend: EmailSendCapture = await app.reports.sendByEmail();
+
+        // --- Assert: request basics ---
+        expect(emailSend && emailSend.requestUrl).toBeTruthy();
+        expect(emailSend.method).toBe('POST');
+
+        // --- Assert: multipart / file artifacts (each block runs only if the capture produced that path) ---
+        if (emailSend.savedBodyPath) {
+            expect(fs.existsSync(emailSend.savedBodyPath)).toBeTruthy();
+            const stat = fs.statSync(emailSend.savedBodyPath);
+            expect(stat.size).toBeGreaterThan(0);
+        }
+        if (emailSend.filename) {
+            expect(emailSend.filename).toMatch(/\.(json|csv|xlsx)$/i);
+        }
+
+        if (emailSend.extractedFilePath) {
+            expect(fs.existsSync(emailSend.extractedFilePath)).toBeTruthy();
+            const stat2 = fs.statSync(emailSend.extractedFilePath);
+            expect(stat2.size).toBeGreaterThan(0);
+            expect(emailSend.extractedFilePath).toMatch(/\.(json|csv|xlsx)$/i);
+        }
+
+        if (emailSend.responseJsonPath) {
+            expect(fs.existsSync(emailSend.responseJsonPath)).toBeTruthy();
+            const json = JSON.parse(fs.readFileSync(emailSend.responseJsonPath, 'utf8')) as { data?: unknown };
+            expect(json && json.data).toBeTruthy();
+        }
+        if (emailSend.jobId) {
+            expect(String(emailSend.jobId)).toMatch(/^\d+$/);
+        }
+
+        // --- Assert: GraphQL request body vs fixture (`operationName`, query substring, `variables.req`) ---
+        if (emailSend.requestJsonPath) {
+            const requestJson = JSON.parse(
+                fs.readFileSync(emailSend.requestJsonPath, 'utf8')
+            ) as GraphqlRequestBody;
+
+            expect(requestJson).toBeTruthy();
+            expect(expectedRequest).toBeTruthy();
+            expect(requestJson.operationName).toBe(expectedRequest.operationName);
+
+            const norm = (s: string | undefined | null): string =>
+                String(s || '').replace(/\\[nrt]/g, ' ').replace(/\s+/g, ' ').trim();
+            expect(norm(requestJson.query)).toContain(norm(expectedRequest.queryContains));
+
+            const reqVars = requestJson?.variables?.req ?? {};
+            const expVars: LogisticsReportGraphqlExpected['variables']['req'] =
+                expectedRequest?.variables?.req ?? {
+                    paymentTypeNames: [],
+                    targetColumnForDateSearch: '',
+                    currencyNames: []
+                };
+
+            expect(Array.isArray(reqVars.paymentType)).toBeTruthy();
+            const reqPaymentNames = (reqVars.paymentType ?? []).map(
+                (code: string) => paymentCodeToName[code] || `UNKNOWN:${code}`
+            );
+            expect(reqPaymentNames).toStrictEqual(expVars.paymentTypeNames);
+
+            expect(reqVars.targetColumnForDateSearch).toBe(expVars.targetColumnForDateSearch);
+
+            const expectedFromDay =
+                expVars.fromDateDay === 'CURRENT_MONTH_START' || !expVars.fromDateDay
+                    ? currentMonthStartUTC
+                    : expVars.fromDateDay;
+            const expectedToDay =
+                expVars.toDateDay === 'CURRENT_MONTH_END' || !expVars.toDateDay
+                    ? currentMonthEndUTC
+                    : expVars.toDateDay;
+            const fromDateStr = String(reqVars.fromDate || '').slice(0, 10);
+            const toDateStr = String(reqVars.toDate || '').slice(0, 10);
+            expect(fromDateStr).toBe(expectedFromDay);
+            expect(toDateStr).toBe(expectedToDay);
+
+            if (Array.isArray(reqVars.carrierIds)) {
+                expect(reqVars.carrierIds.length).toBeGreaterThan(0);
+                expect(reqVars.carrierIds.every(id => typeof id === 'string' && id.length > 0)).toBeTruthy();
+                if (carrierIdsExpected.length > 0) {
+                    expect(reqVars.carrierIds).toStrictEqual(carrierIdsExpected);
+                }
+            } else {
+                expect(typeof reqVars.carrierId === 'string' && reqVars.carrierId.length > 0).toBeTruthy();
+                if (carrierIdsExpected.length === 1) {
+                    expect(reqVars.carrierId).toBe(carrierIdsExpected[0]);
+                }
+            }
+
+            if (reqVars.emailForSendReport !== undefined && uiUsername) {
+                expect(reqVars.emailForSendReport).toBe(uiUsername);
+            }
+
+            expect(Array.isArray(reqVars.currency)).toBeTruthy();
+            const reqCurrencyNames = (reqVars.currency ?? []).map(
+                (id: string) => currencyIdToName[id] || `UNKNOWN:${id}`
+            );
+            expect(reqCurrencyNames).toStrictEqual(expVars.currencyNames);
+        }
+
+        // --- Assert: binary/stream response saved from backend (when present) ---
+        if (emailSend.backendFilePath) {
+            expect(fs.existsSync(emailSend.backendFilePath)).toBeTruthy();
+            const stat3 = fs.statSync(emailSend.backendFilePath);
+            expect(stat3.size).toBeGreaterThan(0);
+        }
+    });
+});

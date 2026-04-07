@@ -1,0 +1,33 @@
+{
+  "name": "logistics-web-e2e",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "npx eslint --fix",
+    "e2e": "npx playwright test --config=./playwright.config.ts",
+    "e2e-logistics": "npx playwright test tests --config=./playwright.config.ts",
+    "pet:dev": "npm run dev --prefix pet-app",
+    "docker:pet:build": "docker build -t logistics-pet-ui ./pet-app",
+    "docker:pet:up": "docker compose up --build pet-app"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@playwright/test": "^1.48.2",
+    "@types/node": "^22.9.0",
+    "allure-playwright": "^3.0.6",
+    "eslint": "^9.17.0",
+    "globals": "^15.14.0",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.0"
+  },
+  "dependencies": {
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
+    "dotenv": "^16.4.5"
+  }
+}

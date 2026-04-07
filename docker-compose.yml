@@ -1,0 +1,10 @@
+# PET UI: http://localhost:5173 — point Playwright `LOGISTICS_BASE_CLIENT_URL` here when testing against Docker.
+services:
+  pet-app:
+    build:
+      context: ./pet-app
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      NODE_ENV: production

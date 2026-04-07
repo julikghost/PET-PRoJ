@@ -1,0 +1,25 @@
+{
+  // E2E repo only: Playwright config, POM, utils, tests. The PET UI lives in pet-app/ (its own tsconfig).
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "allowJs": true,
+    "types": ["node"]
+  },
+  "include": [
+    "playwright.config.ts",
+    "config-logistics.ts",
+    "utils/**/*.ts",
+    "pageObjects/**/*.ts",
+    "tests/**/*.ts"
+  ],
+  "exclude": ["node_modules", "pet-app", "dist", "test-results", "playwright-report", "e2e-captures"]
+}

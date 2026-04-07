@@ -1,0 +1,29 @@
+{
+  "_comment": "Sample report fixtures: copy to fixtures.local.json or pass via LOGISTICS_REPORT_FIXTURES_JSON; values must match your environment. After load, apply E2E_FIXTURE_SUBSTITUTIONS_JSON if needed.",
+  "reportCarrier": "<exact PetMover option label as shown in Reports filter>",
+  "uiPaymentMethods": ["<Payment method A>", "<Payment method B>", "<Payment method C>"],
+  "uiCurrencies": ["<Currency A>", "<Currency B>"],
+  "paymentCodeToName": {
+    "card": "<Payment method A>",
+    "cash": "<Payment method B>",
+    "<api-payment-code>": "<Payment method C>"
+  },
+  "currencyIdToName": {
+    "<currency-id-1>": "<Currency A>",
+    "<currency-id-2>": "<Currency B>"
+  },
+  "carrierIdsExpected": ["<carrier-id>"],
+  "graphql": {
+    "operationName": "<ReportMutationName>",
+    "queryContains": "<substring of GraphQL field or operation body>",
+    "variables": {
+      "req": {
+        "paymentTypeNames": ["<Payment method A>", "<Payment method B>", "<Payment method C>"],
+        "targetColumnForDateSearch": "departureDate",
+        "fromDateDay": "CURRENT_MONTH_START",
+        "toDateDay": "CURRENT_MONTH_END",
+        "currencyNames": ["<Currency A>", "<Currency B>"]
+      }
+    }
+  }
+}

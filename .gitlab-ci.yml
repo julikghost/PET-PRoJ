@@ -1,0 +1,5 @@
+# Includes shared GitLab CI pipeline for Playwright tests from an external project.
+include:
+  - project: devops/travelling-gitlab-pipelines
+    ref: main
+    file: qa/e2e-playwright.yml
