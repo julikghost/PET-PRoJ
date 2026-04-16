@@ -70,11 +70,12 @@ export const petMovers = {
 };
 
 export const reports = {
-    carrier: process.env.E2E_UI_REPORT_CARRIER || 'PetMover',
+    petMover: process.env.E2E_UI_REPORT_PET_MOVER || 'PetMover',
     dateRange: process.env.E2E_UI_REPORT_DATE_RANGE || 'Date',
     fileType: process.env.E2E_UI_REPORT_FILE_TYPE || 'Format',
     paymentType: process.env.E2E_UI_REPORT_PAYMENT || 'Payment methods',
     currency: process.env.E2E_UI_REPORT_CURRENCY || 'Currency',
+    sendReportTo: process.env.E2E_UI_REPORT_SEND_TO || 'Send report to',
     download: process.env.E2E_UI_REPORT_DOWNLOAD || 'Download',
     datePlaceholderStart: process.env.E2E_UI_DATE_RANGE_START_PH || 'Start date',
     datePlaceholderEnd: process.env.E2E_UI_DATE_RANGE_END_PH || 'End date',

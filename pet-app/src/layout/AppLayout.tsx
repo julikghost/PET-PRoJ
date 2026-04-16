@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
-import { Flex, Layout, Menu } from 'antd';
+import { Button, Flex, Layout, Menu } from 'antd';
 import type { MenuProps } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { BrandLogo } from '../components/BrandLogo';
 import { BRAND_NAME } from '../brand';
-import { isPetAccountant, isPetAdmin } from '../auth';
+import { isPetAccountant, isPetAdmin, signOut } from '../auth';
 import { petTheme } from '../theme/palette';
 
 const { Header, Sider, Content } = Layout;
@@ -97,38 +97,50 @@ export function AppLayout ({ children }: { children: ReactNode }): JSX.Element {
                         color: petTheme.headerText,
                         paddingInline: 24,
                         lineHeight: '64px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
                     }}
                 >
-                    <span style={{ fontWeight: 600, fontSize: 18 }}>{BRAND_NAME}</span>
-                    {admin ? (
-                        <span
-                            style={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                padding: '2px 8px',
-                                borderRadius: 4,
-                                background: 'rgba(255,255,255,0.12)',
+                    <Flex align="center" justify="space-between" style={{ width: '100%' }}>
+                        <Flex align="center" gap={12}>
+                            <span style={{ fontWeight: 600, fontSize: 18 }}>{BRAND_NAME}</span>
+                            {admin ? (
+                                <span
+                                    style={{
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        padding: '2px 8px',
+                                        borderRadius: 4,
+                                        background: 'rgba(255,255,255,0.12)',
+                                    }}
+                                >
+                                    PetAdmin
+                                </span>
+                            ) : null}
+                            {accountant ? (
+                                <span
+                                    style={{
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        padding: '2px 8px',
+                                        borderRadius: 4,
+                                        background: 'rgba(255,255,255,0.12)',
+                                    }}
+                                >
+                                    PetAccountant
+                                </span>
+                            ) : null}
+                        </Flex>
+                        <Button
+                            type="default"
+                            ghost
+                            data-testid="pet-quit"
+                            onClick={() => {
+                                signOut();
+                                navigate('/login', { replace: true });
                             }}
                         >
-                            PetAdmin
-                        </span>
-                    ) : null}
-                    {accountant ? (
-                        <span
-                            style={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                padding: '2px 8px',
-                                borderRadius: 4,
-                                background: 'rgba(255,255,255,0.12)',
-                            }}
-                        >
-                            PetAccountant
-                        </span>
-                    ) : null}
+                            Quit
+                        </Button>
+                    </Flex>
                 </Header>
                 <Content
                     style={{

@@ -1,0 +1,53 @@
+/**
+ * English city names (continental Europe focus). Used by Points → City dropdown; kept sorted A–Z.
+ */
+const POINT_CITIES_RAW = [
+    'Amsterdam',
+    'Athens',
+    'Barcelona',
+    'Belgrade',
+    'Berlin',
+    'Brussels',
+    'Bucharest',
+    'Budapest',
+    'Cologne',
+    'Copenhagen',
+    'Frankfurt',
+    'Geneva',
+    'Gothenburg',
+    'Hamburg',
+    'Helsinki',
+    'Kraków',
+    'Lisbon',
+    'Ljubljana',
+    'Lyon',
+    'Madrid',
+    'Marseille',
+    'Milan',
+    'Munich',
+    'Oslo',
+    'Paris',
+    'Porto',
+    'Prague',
+    'Riga',
+    'Rome',
+    'Rotterdam',
+    'Sofia',
+    'Stockholm',
+    'Stuttgart',
+    'Tallinn',
+    'Thessaloniki',
+    'Tirana',
+    'Toulouse',
+    'Turin',
+    'Valencia',
+    'Vienna',
+    'Vilnius',
+    'Warsaw',
+    'Zagreb',
+    'Zurich',
+] as const;
+
+export const POINT_CITY_OPTIONS: readonly string[] = [...POINT_CITIES_RAW].sort((a, b) =>
+    a.localeCompare(b, 'en', { sensitivity: 'base' })
+);

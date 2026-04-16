@@ -7,8 +7,16 @@ import {
     useState,
     type ReactNode,
 } from 'react';
-import { toast } from 'sonner';
-import type { BookingRecord, PetShipRecord, PointRecord } from '../types/petLogistics';
+import { toast } from '../petToast';
+import type {
+    BookingBillingCurrency,
+    BookingPaymentMethod,
+    BookingRecord,
+    PetShipCurrency,
+    PetShipRecord,
+    PointRecord,
+} from '../types/petLogistics';
+import { computeBookingPrice } from '../utils/pricing';
 
 export const PET_LOGISTICS_STORAGE_KEY = 'pet-logistics-v1';
 
@@ -24,6 +32,114 @@ const emptyState = (): StoreState => ({
     bookings: [],
 });
 
+function normalizePetShip (raw: unknown): PetShipRecord | null {
+    if (raw === null || typeof raw !== 'object') {
+        return null;
+    }
+    const s = raw as Record<string, unknown>;
+    if (
+        typeof s.id !== 'string'
+        || typeof s.refCode !== 'string'
+        || typeof s.fromPointId !== 'string'
+        || typeof s.toPointId !== 'string'
+        || typeof s.departure !== 'string'
+        || typeof s.arrival !== 'string'
+        || typeof s.petMover !== 'string'
+        || typeof s.status !== 'string'
+    ) {
+        return null;
+    }
+    const currency: PetShipCurrency = s.currency === 'USD' ? 'USD' : 'EUR';
+    if (s.status !== 'planned' && s.status !== 'active' && s.status !== 'done') {
+        return null;
+    }
+    const cars = typeof s.cars === 'string' ? s.cars : '';
+    const drivers = typeof s.drivers === 'string' ? s.drivers : '';
+
+    return {
+        id: s.id,
+        refCode: s.refCode,
+        fromPointId: s.fromPointId,
+        toPointId: s.toPointId,
+        departure: s.departure,
+        arrival: s.arrival,
+        petMover: s.petMover,
+        currency,
+        cars,
+        drivers,
+        status: s.status,
+    };
+}
+
+function parseStoredPetLabels (b: Record<string, unknown>): string[] | null {
+    if (Array.isArray(b.petLabels)) {
+        const arr = b.petLabels
+            .filter((x): x is string => typeof x === 'string')
+            .map((s) => s.trim())
+            .filter(Boolean);
+
+        return arr.length > 0 ? arr : null;
+    }
+    if (typeof b.petLabel === 'string' && b.petLabel.trim()) {
+        return [b.petLabel.trim()];
+    }
+
+    return null;
+}
+
+function normalizeBooking (raw: unknown, petShips: PetShipRecord[]): BookingRecord | null {
+    if (raw === null || typeof raw !== 'object') {
+        return null;
+    }
+    const b = raw as Record<string, unknown>;
+    const petLabels = parseStoredPetLabels(b);
+    if (
+        typeof b.id !== 'string'
+        || typeof b.refCode !== 'string'
+        || typeof b.petShipId !== 'string'
+        || typeof b.date !== 'string'
+        || petLabels === null
+        || typeof b.weightKg !== 'number'
+    ) {
+        return null;
+    }
+    const ship = petShips.find((x) => x.id === b.petShipId);
+    const currency: PetShipCurrency =
+        b.currency === 'USD' || b.currency === 'EUR' ? b.currency : ship?.currency ?? 'EUR';
+    let price = typeof b.price === 'number' && !Number.isNaN(b.price) ? b.price : NaN;
+    if (Number.isNaN(price) && ship) {
+        price = computeBookingPrice(b.weightKg, ship.currency, ship.departure, ship.arrival);
+    }
+    if (Number.isNaN(price)) {
+        price = 0;
+    }
+
+    const paymentMethod: BookingPaymentMethod =
+        b.paymentMethod === 'card' || b.paymentMethod === 'cash' || b.paymentMethod === 'petpay'
+            ? b.paymentMethod
+            : 'card';
+    const billingCurrency: BookingBillingCurrency = ship
+        ? ship.currency === 'USD'
+            ? 'cur-usd'
+            : 'cur-eur'
+        : b.billingCurrency === 'cur-usd' || b.billingCurrency === 'cur-eur'
+            ? b.billingCurrency
+            : 'cur-eur';
+
+    return {
+        id: b.id,
+        refCode: b.refCode,
+        petShipId: b.petShipId,
+        date: b.date,
+        petLabels,
+        weightKg: b.weightKg,
+        price,
+        currency,
+        paymentMethod,
+        billingCurrency,
+    };
+}
+
 function loadState (): StoreState {
     try {
         const raw = localStorage.getItem(PET_LOGISTICS_STORAGE_KEY);
@@ -31,10 +147,18 @@ function loadState (): StoreState {
             return emptyState();
         }
         const p = JSON.parse(raw) as Partial<StoreState>;
+        const points = Array.isArray(p.points) ? p.points : [];
+        const petShipsRaw = Array.isArray(p.petShips) ? p.petShips : [];
+        const petShips = petShipsRaw.map(normalizePetShip).filter((x): x is PetShipRecord => x !== null);
+        const bookingsRaw = Array.isArray(p.bookings) ? p.bookings : [];
+        const bookings = bookingsRaw
+            .map((row) => normalizeBooking(row, petShips))
+            .filter((x): x is BookingRecord => x !== null);
+
         return {
-            points: Array.isArray(p.points) ? p.points : [],
-            petShips: Array.isArray(p.petShips) ? p.petShips : [],
-            bookings: Array.isArray(p.bookings) ? p.bookings : [],
+            points,
+            petShips,
+            bookings,
         };
     } catch {
         return emptyState();
@@ -66,7 +190,9 @@ export type PetLogisticsContextValue = {
     deletePoint: (id: string) => boolean;
     upsertPetShip: (row: Omit<PetShipRecord, 'id'> & { id?: string }) => boolean;
     deletePetShip: (id: string) => boolean;
-    upsertBooking: (row: Omit<BookingRecord, 'id'> & { id?: string }) => boolean;
+    upsertBooking: (
+        row: Omit<BookingRecord, 'id' | 'price' | 'currency' | 'billingCurrency'> & { id?: string }
+    ) => boolean;
     deleteBooking: (id: string) => void;
 };
 
@@ -168,6 +294,9 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
                 departure: row.departure.trim(),
                 arrival: row.arrival.trim(),
                 petMover: row.petMover.trim(),
+                currency: row.currency === 'USD' ? 'USD' : 'EUR',
+                cars: typeof row.cars === 'string' ? row.cars.trim() : '',
+                drivers: typeof row.drivers === 'string' ? row.drivers.trim() : '',
                 status: row.status,
             };
             let accepted = false;
@@ -225,25 +354,44 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
     }, []);
 
     const upsertBooking = useCallback(
-        (row: Omit<BookingRecord, 'id'> & { id?: string }): boolean => {
+        (
+            row: Omit<BookingRecord, 'id' | 'price' | 'currency' | 'billingCurrency'> & { id?: string }
+        ): boolean => {
             const id = row.id ?? newBookingId();
-            const full: BookingRecord = {
-                id,
-                refCode: row.refCode.trim(),
-                petShipId: row.petShipId,
-                date: row.date,
-                petLabel: row.petLabel.trim(),
-                weightKg: row.weightKg,
-            };
             let accepted = false;
             setState((prev) => {
-                const ship = prev.petShips.find((s) => s.id === full.petShipId);
+                const ship = prev.petShips.find((s) => s.id === row.petShipId);
                 if (!ship) {
                     toast.error('Select a valid pet ship');
 
                     return prev;
                 }
-                const existing = prev.bookings.find((b) => b.id === full.id);
+                const price = computeBookingPrice(row.weightKg, ship.currency, ship.departure, ship.arrival);
+                const paymentMethod: BookingPaymentMethod =
+                    row.paymentMethod === 'card' || row.paymentMethod === 'cash' || row.paymentMethod === 'petpay'
+                        ? row.paymentMethod
+                        : 'card';
+                const billingCurrency: BookingBillingCurrency =
+                    ship.currency === 'USD' ? 'cur-usd' : 'cur-eur';
+                const petLabels = row.petLabels.map((s) => s.trim()).filter(Boolean);
+                if (petLabels.length === 0) {
+                    toast.error('Select at least one species');
+
+                    return prev;
+                }
+                const full: BookingRecord = {
+                    id,
+                    refCode: row.refCode.trim(),
+                    petShipId: row.petShipId,
+                    date: row.date,
+                    petLabels,
+                    weightKg: row.weightKg,
+                    price,
+                    currency: ship.currency,
+                    paymentMethod,
+                    billingCurrency,
+                };
+                const existing = prev.bookings.find((b) => b.id === id);
                 const bookable = ship.status === 'planned' || ship.status === 'active';
                 const sameShipKeep = existing?.petShipId === full.petShipId;
                 if (!bookable && !sameShipKeep) {
@@ -253,7 +401,7 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
                 }
                 const refNorm = full.refCode.trim().toLowerCase();
                 const dup = prev.bookings.some(
-                    (b) => b.id !== full.id && b.refCode.trim().toLowerCase() === refNorm
+                    (b) => b.id !== id && b.refCode.trim().toLowerCase() === refNorm
                 );
                 if (dup) {
                     toast.error('Booking ref must be unique');
@@ -261,9 +409,9 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
                     return prev;
                 }
                 accepted = true;
-                const exists = prev.bookings.some((b) => b.id === full.id);
+                const exists = prev.bookings.some((b) => b.id === id);
                 const bookings = exists
-                    ? prev.bookings.map((b) => (b.id === full.id ? full : b))
+                    ? prev.bookings.map((b) => (b.id === id ? full : b))
                     : [...prev.bookings, full];
 
                 return { ...prev, bookings };

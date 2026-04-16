@@ -1,36 +1,31 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Button, Form, Input, Modal, Select, Space, Switch, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { toast } from 'sonner';
+import { toast } from '../petToast';
+import { type PetMoverRow, usePetMovers } from '../petMoversStorage';
 
-export type PetMoverRow = {
-    id: string;
-    name: string;
-    code: string;
-    region: string;
-    active: boolean;
-};
+export type { PetMoverRow } from '../petMoversStorage';
 
-const REGION_OPTIONS = [
-    { value: 'EU', label: 'EU' },
-    { value: 'US', label: 'US' },
+const CURRENCY_OPTIONS = [
+    { value: 'EUR', label: 'EUR' },
+    { value: 'USD', label: 'USD' },
 ];
 
 function newId (): string {
     return `pm-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/** Carriers-style admin list with create / edit / delete (PetAdmin only). */
+/** PetMovers admin list with create / edit / delete (PetAdmin only). */
 export function PetMoversPage (): JSX.Element {
-    const [rows, setRows] = useState<PetMoverRow[]>([]);
+    const [rows, setRows] = usePetMovers();
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<PetMoverRow | null>(null);
-    const [form] = Form.useForm<Pick<PetMoverRow, 'name' | 'code' | 'region' | 'active'>>();
+    const [form] = Form.useForm<Pick<PetMoverRow, 'name' | 'code' | 'active' | 'currency' | 'cars' | 'drivers'>>();
 
     const openCreate = useCallback(() => {
         setEditing(null);
         form.resetFields();
-        form.setFieldsValue({ name: '', code: '', region: 'EU', active: true });
+        form.setFieldsValue({ name: '', code: '', active: true, currency: 'EUR', cars: '', drivers: '' });
         setModalOpen(true);
     }, [form]);
 
@@ -40,8 +35,10 @@ export function PetMoversPage (): JSX.Element {
             form.setFieldsValue({
                 name: record.name,
                 code: record.code,
-                region: record.region,
                 active: record.active,
+                currency: record.currency,
+                cars: record.cars,
+                drivers: record.drivers,
             });
             setModalOpen(true);
         },
@@ -100,7 +97,7 @@ export function PetMoversPage (): JSX.Element {
         () => [
             { title: 'Name', dataIndex: 'name', key: 'name' },
             { title: 'Code', dataIndex: 'code', key: 'code', width: 140 },
-            { title: 'Region', dataIndex: 'region', key: 'region', width: 100 },
+            { title: 'Curr.', dataIndex: 'currency', key: 'currency', width: 64 },
             {
                 title: 'Active',
                 dataIndex: 'active',
@@ -147,7 +144,7 @@ export function PetMoversPage (): JSX.Element {
                 </Button>
             </Space>
             <p style={{ marginBottom: 16, color: 'rgba(0,0,0,0.55)' }}>
-                Carriers directory (PetAdmin only).
+                PetMovers directory (PetAdmin only).
             </p>
             <div data-testid="pet-movers-table">
                 <Table<PetMoverRow>
@@ -177,7 +174,7 @@ export function PetMoversPage (): JSX.Element {
                     form={form}
                     layout="vertical"
                     className="ant-form"
-                    initialValues={{ region: 'EU', active: true }}
+                    initialValues={{ active: true, currency: 'EUR', cars: '', drivers: '' }}
                 >
                     <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Required' }]}>
                         <Input data-testid="pet-mover-field-name" />
@@ -185,8 +182,27 @@ export function PetMoversPage (): JSX.Element {
                     <Form.Item name="code" label="Code" rules={[{ required: true, message: 'Required' }]}>
                         <Input data-testid="pet-mover-field-code" />
                     </Form.Item>
-                    <Form.Item name="region" label="Region" rules={[{ required: true }]}>
-                        <Select options={REGION_OPTIONS} data-testid="pet-mover-field-region" />
+                    <Form.Item name="cars" label="Cars">
+                        <Input.TextArea
+                            rows={2}
+                            placeholder="Optional"
+                            data-testid="pet-mover-field-cars"
+                        />
+                    </Form.Item>
+                    <Form.Item name="drivers" label="Drivers">
+                        <Input.TextArea
+                            rows={2}
+                            placeholder="Optional"
+                            data-testid="pet-mover-field-drivers"
+                        />
+                    </Form.Item>
+                    <Form.Item
+                        name="currency"
+                        label="Currency"
+                        tooltip="Pet ship and booking prices use this tariff currency (EUR / USD rates)."
+                        rules={[{ required: true }]}
+                    >
+                        <Select options={CURRENCY_OPTIONS} data-testid="pet-mover-field-currency" />
                     </Form.Item>
                     <Form.Item name="active" label="Active" valuePropName="checked">
                         <Switch data-testid="pet-mover-field-active" />

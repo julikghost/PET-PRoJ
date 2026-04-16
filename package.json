@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "dev": "npm run dev --prefix pet-app",
     "typecheck": "tsc --noEmit",
     "lint": "npx eslint --fix",
     "e2e": "npx playwright test --config=./playwright.config.ts",

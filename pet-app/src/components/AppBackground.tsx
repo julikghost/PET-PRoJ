@@ -1,10 +1,29 @@
+import { useLocation } from 'react-router-dom';
 import { CADILLAC_PATTERN_SRC } from '../brand';
+import { petTheme } from '../theme/palette';
 
 /**
- * Full-viewport repeating Cadillac pattern (green car, transparent areas in PNG).
- * No blur / no white wash — page chrome stays readable via layout surfaces.
+ * Full-viewport background: plain fill on `/login`; repeating pattern elsewhere.
  */
 export function AppBackground (): JSX.Element {
+    const { pathname } = useLocation();
+    const isLogin = pathname === '/login';
+
+    if (isLogin) {
+        return (
+            <div
+                aria-hidden
+                style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 0,
+                    pointerEvents: 'none',
+                    backgroundColor: petTheme.pageBg,
+                }}
+            />
+        );
+    }
+
     return (
         <div
             aria-hidden

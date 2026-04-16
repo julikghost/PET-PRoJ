@@ -1,9 +1,12 @@
 /**
- * PetMovers (carriers) admin screen: table CRUD via modal and delete confirmation.
+ * PetMovers admin screen: table CRUD via modal and delete confirmation.
  */
 import { test, expect } from '@playwright/test';
 import type { Page, Locator } from '@playwright/test';
 import { petMovers as petMoversText } from '../utils/text';
+
+/** Same key as `pet-app/src/petMoversStorage.ts`. */
+const PET_MOVERS_STORAGE_KEY = 'pet-movers-v1';
 
 export class PetMovers {
     readonly page: Page;
@@ -33,11 +36,46 @@ export class PetMovers {
         });
     }
 
+    /**
+     * Precondition for Reports: PetAdmin page; creates one active PetMover and returns its storage id + Select label `Name (code)`.
+     */
+    async createActivePetMover (values: {
+        name: string;
+        code: string;
+    }): Promise<{ id: string; label: string }> {
+        return await test.step(`Precondition: PetMover ${values.code}`, async () => {
+            await this.expectLoaded();
+            await this.clickAdd();
+            await this.fillForm({ ...values, active: true });
+            await this.saveModal();
+            await expect(this.page.getByText(petMoversText.toastCreated).first()).toBeVisible();
+            const id = await this.page.evaluate(
+                ({ key, code }: { key: string; code: string }) => {
+                    const raw = localStorage.getItem(key);
+                    if (!raw) {
+                        return '';
+                    }
+                    const rows = JSON.parse(raw) as { id: string; code: string }[];
+                    const row = rows.find((r) => r.code === code);
+
+                    return row?.id ?? '';
+                },
+                { key: PET_MOVERS_STORAGE_KEY, code: values.code }
+            );
+            if (!id) {
+                throw new Error(`PetMover id not found in localStorage for code "${values.code}"`);
+            }
+
+            return { id, label: `${values.name} (${values.code})` };
+        });
+    }
+
     async fillForm (values: {
         name: string;
         code: string;
-        region: string;
         active?: boolean;
+        /** Defaults to EUR in UI; set to switch tariff currency. */
+        currency?: 'EUR' | 'USD';
     }): Promise<void> {
         await test.step(`Fill PetMover form: ${values.code}`, async () => {
             const modal = this.editDialog();
@@ -46,9 +84,11 @@ export class PetMovers {
             await modal.getByTestId('pet-mover-field-name').fill(values.name);
             await modal.getByTestId('pet-mover-field-code').fill(values.code);
 
-            await modal.getByTestId('pet-mover-field-region').click();
-            const dropdown = this.page.locator('.ant-select-dropdown:visible').last();
-            await dropdown.locator('.ant-select-item-option-content').filter({ hasText: values.region }).first().click();
+            if (values.currency !== undefined) {
+                await modal.getByTestId('pet-mover-field-currency').click();
+                const curDd = this.page.locator('.ant-select-dropdown:visible').last();
+                await curDd.locator('.ant-select-item-option-content').filter({ hasText: values.currency }).first().click();
+            }
 
             const sw = modal.getByTestId('pet-mover-field-active');
             const checked = (await sw.getAttribute('aria-checked')) === 'true';
@@ -77,6 +117,14 @@ export class PetMovers {
     async clickDelete (code: string): Promise<void> {
         await test.step(`Delete PetMover ${code}`, async () => {
             await this.root.getByTestId(`pet-mover-delete-${code}`).click();
+        });
+    }
+
+    async deletePetMoverAndConfirm (code: string): Promise<void> {
+        await test.step(`Delete PetMover ${code} and confirm`, async () => {
+            await this.clickDelete(code);
+            await this.confirmDeleteInDialog();
+            await expect(this.page.getByText(petMoversText.toastDeleted).first()).toBeVisible();
         });
     }
 

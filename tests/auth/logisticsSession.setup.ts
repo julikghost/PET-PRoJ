@@ -1,7 +1,3 @@
-/**
- * Playwright setup project: sign into the web UI, optional authorization consent,
- * persist `storageState`, and set `E2E_SESSION_ACCESS_TOKEN` on the worker.
- */
 import * as fs from 'fs';
 import * as path from 'path';
 import { test as setup, expect } from '@playwright/test';
@@ -24,19 +20,40 @@ const offlineScopeCheckbox =
     || process.env.E2E_OIDC_OFFLINE_CHECKBOX?.trim()
     || 'offline_access';
 
+/** PET dev server + `.env.example` use `identifier`; skip slow OIDC-only steps unless consent UI is configured. */
+function usePetStubLoginFlow (): boolean {
+    if (process.env.E2E_HOSTED_LOGISTICS_LOGIN === '1') {
+        return false;
+    }
+    const idField = process.env.E2E_LOGIN_USER_FIELD_NAME?.trim();
+    if (idField !== 'identifier') {
+        return false;
+    }
+    const base = config.baseUrl.trim().toLowerCase();
+    return base.includes('localhost') || base.includes('127.0.0.1');
+}
+
 setup('Persist logistics web session storage', async ({ page }) => {
     const app = new LogisticsApp(page);
-    await app.openLogisticsApp();
 
-    await app.login.clickLogin();
-    await app.login.signIn(uiUsername, password);
+    if (usePetStubLoginFlow()) {
+        const loginUrl = new URL('login', `${baseUrl.trim().replace(/\/?$/, '/')}`).href;
+        await page.goto(loginUrl);
+        await app.login.signInPetApp(uiUsername, password);
+    } else {
+        await app.openLogisticsApp();
+        await app.login.clickLogin();
+        await app.login.signIn(uiUsername, password);
+    }
 
-    try {
-        await app.login.checkConsentIsVisible();
-        await page.getByRole('checkbox', { name: offlineScopeCheckbox }).check();
-        await app.login.clickAllow();
-    } catch {
-        // consent screen optional
+    if (process.env.E2E_CONSENT_ROOT_SELECTOR?.trim()) {
+        try {
+            await app.login.checkConsentIsVisible();
+            await page.getByRole('checkbox', { name: offlineScopeCheckbox }).check();
+            await app.login.clickAllow();
+        } catch {
+            // consent screen optional
+        }
     }
 
     await expect(page).toHaveURL(postLoginClientUrlRegex(baseUrl));

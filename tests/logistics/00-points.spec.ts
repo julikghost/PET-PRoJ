@@ -1,6 +1,3 @@
-/**
- * Points directory CRUD + sidebar (data shared with PetShipping and Booking via localStorage).
- */
 import { test, expect } from '@playwright/test';
 import { MENU_ITEM } from '../../utils/constants';
 import { config } from '../../config-logistics';
@@ -25,12 +22,12 @@ test.describe('Points', () => {
         const code = `E2E-P-${Date.now()}`;
 
         await pt.clickAdd();
-        await pt.fillForm({
+        await pt.fillCodeNameAndCity({
             code,
             name: 'E2E Terminal',
-            city: 'TestCity',
-            kindLabel: pointsText.kindHub,
+            city: 'Berlin',
         });
+        await pt.selectKindHub();
         await pt.saveModal();
         await expect(page.getByText(pointsText.toastCreated)).toBeVisible();
 
@@ -38,12 +35,12 @@ test.describe('Points', () => {
         await pt.expectRowContains('E2E Terminal');
 
         await pt.clickEdit(code);
-        await pt.fillForm({
+        await pt.fillCodeNameAndCity({
             code,
             name: 'E2E Terminal Plus',
-            city: 'TestCity',
-            kindLabel: pointsText.kindStop,
+            city: 'Munich',
         });
+        await pt.selectKindByLabel(pointsText.kindStop);
         await pt.saveModal();
         await expect(page.getByText(pointsText.toastUpdated)).toBeVisible();
         await pt.expectRowContains('E2E Terminal Plus');

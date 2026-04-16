@@ -1,10 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Button, Form, Input, Modal, Select, Space, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { toast } from 'sonner';
+import { toast } from '../petToast';
 import { usePetLogistics } from '../context/PetLogisticsContext';
+import { POINT_CITY_OPTIONS } from '../data/pointCities';
+import { PointsMap } from '../components/PointsMap';
 import { petTheme } from '../theme/palette';
 import type { PointRecord } from '../types/petLogistics';
+
+const CITY_SELECT_OPTIONS = POINT_CITY_OPTIONS.map((c) => ({ value: c, label: c }));
 
 const KIND_OPTIONS = [
     { value: 'hub', label: 'Hub' },
@@ -128,6 +132,12 @@ export function PointsPage (): JSX.Element {
             <p style={{ marginBottom: 16, color: petTheme.textMuted }}>
                 Create network points first. PetShipping routes and bookings depend on this directory.
             </p>
+            <div style={{ marginBottom: 20 }}>
+                <PointsMap points={points} />
+                <p style={{ margin: '8px 0 0', fontSize: 12, color: petTheme.textMuted }}>
+                    Map shows approximate locations by city (OpenStreetMap).
+                </p>
+            </div>
             <div data-testid="points-table">
                 <Table<PointRecord>
                     columns={columns}
@@ -157,8 +167,14 @@ export function PointsPage (): JSX.Element {
                     <Form.Item name="name" label="Name" rules={[{ required: true }]}>
                         <Input data-testid="points-field-name" />
                     </Form.Item>
-                    <Form.Item name="city" label="City" rules={[{ required: true }]}>
-                        <Input data-testid="points-field-city" />
+                    <Form.Item name="city" label="City" rules={[{ required: true, message: 'Required' }]}>
+                        <Select
+                            data-testid="points-field-city"
+                            showSearch
+                            optionFilterProp="label"
+                            placeholder="Select city"
+                            options={CITY_SELECT_OPTIONS}
+                        />
                     </Form.Item>
                     <Form.Item name="kind" label="Kind" rules={[{ required: true }]}>
                         <Select options={KIND_OPTIONS} data-testid="points-field-kind" />

@@ -18,6 +18,60 @@ export class Booking {
         return this.page.getByRole('dialog').filter({ has: this.page.getByTestId('booking-form') });
     }
 
+    private visibleSelectDropdown (): Locator {
+        return this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+    }
+
+    private selectDropdownWithOption (optionName: string, exact = true): Locator {
+        if (exact) {
+            return this.visibleSelectDropdown().filter({
+                has: this.page.getByRole('option', { name: optionName, exact: true }),
+            });
+        }
+
+        return this.visibleSelectDropdown().filter({
+            has: this.page.locator('.ant-select-item-option-content').filter({ hasText: optionName }),
+        });
+    }
+
+    private async selectOptionByClick (
+        field: Locator,
+        optionName: string,
+        exact = true
+    ): Promise<void> {
+        await field.locator('.ant-select-selector').click({ force: true });
+        const dropdown = this.selectDropdownWithOption(optionName, exact);
+        await expect(dropdown).toBeVisible({ timeout: 15000 });
+        const option = exact
+            ? dropdown.getByRole('option', { name: optionName, exact: true }).first()
+            : dropdown.locator('.ant-select-item-option-content').filter({ hasText: optionName }).first();
+        await option.click({ force: true });
+        await expect.poll(async () => await dropdown.count(), { timeout: 15000 }).toBe(0);
+    }
+
+    private async addMultiSelectOptionBySearch (
+        field: Locator,
+        optionName: string
+    ): Promise<void> {
+        await field.locator('.ant-select-selector').click({ force: true });
+        const search = field
+            .locator('input[type="search"]')
+            .or(field.locator('.ant-select-selection-search-input'))
+            .first();
+        await expect(search).toBeVisible({ timeout: 5000 });
+        await search.fill(optionName);
+        const dropdown = this.selectDropdownWithOption(optionName);
+        await expect(dropdown).toBeVisible({ timeout: 15000 });
+        await dropdown.getByRole('option', { name: optionName, exact: true }).waitFor({
+            state: 'attached',
+            timeout: 15000,
+        });
+        await search.press('Enter');
+        await expect(field.locator('.ant-select-selection-item').filter({ hasText: optionName }).first()).toBeVisible({
+            timeout: 15000,
+        });
+    }
+
     async expectLoaded (): Promise<void> {
         await test.step('Booking page visible', async () => {
             await expect(this.root).toBeVisible();
@@ -36,8 +90,11 @@ export class Booking {
         refCode: string;
         petShipLabel: string;
         dateYmd: string;
-        petLabel: string;
+        /** Species from the booking catalog (multi-select). */
+        petLabels: string[];
         weight: string;
+        /** Label in Payment method select (default Card). Same set as Reports. */
+        paymentLabel?: string;
     }): Promise<void> {
         await test.step(`Fill booking form: ${values.refCode}`, async () => {
             const modal = this.editDialog();
@@ -45,20 +102,47 @@ export class Booking {
             await modal.getByTestId('booking-field-ref').fill(values.refCode);
 
             await modal.getByTestId('booking-field-pet-ship').click();
-            const dropdown = this.page.locator('.ant-select-dropdown:visible').last();
-            await dropdown.locator('.ant-select-item-option-content').filter({ hasText: values.petShipLabel }).first().click();
+            const petShipDropdown = this.visibleSelectDropdown().last();
+            await expect(petShipDropdown).toBeVisible({ timeout: 15000 });
+            await petShipDropdown
+                .locator('.ant-select-item-option-content')
+                .filter({ hasText: values.petShipLabel })
+                .first()
+                .click({ force: true });
             await modal.locator('.ant-modal-title').click();
 
             const dateInput = modal.getByTestId('booking-field-date').getByRole('textbox');
-            await dateInput.click();
-            await dateInput.clear();
-            await dateInput.fill(values.dateYmd);
-            await dateInput.press('Enter');
+            await dateInput.click({ force: true });
+            const dateDropdown = this.page.locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)').last();
+            await expect(dateDropdown).toBeVisible({ timeout: 15000 });
+            const dateCell = dateDropdown.locator(`td[title="${values.dateYmd}"]`).first();
+            if (await dateCell.count()) {
+                await dateCell.click({ force: true });
+            } else {
+                await dateInput.clear();
+                await dateInput.fill(values.dateYmd);
+                await dateInput.press('Enter');
+            }
+            await expect(dateInput).toHaveValue(values.dateYmd, { timeout: 15000 });
 
-            await modal.getByTestId('booking-field-pet').fill(values.petLabel);
+            const petField = modal.getByTestId('booking-field-pet');
+            for (const name of values.petLabels) {
+                await this.addMultiSelectOptionBySearch(petField, name);
+            }
+            const speciesDropdowns = this.visibleSelectDropdown();
+            if (await speciesDropdowns.count()) {
+                await modal.locator('.ant-modal-title').click({ force: true });
+                await expect.poll(async () => await speciesDropdowns.count(), { timeout: 15000 }).toBe(0);
+            }
+
             const weightInput = modal.getByTestId('booking-field-weight').locator('input');
             await weightInput.click();
             await weightInput.fill(values.weight);
+
+            if (values.paymentLabel?.trim()) {
+                const paymentField = modal.getByTestId('booking-field-payment');
+                await this.selectOptionByClick(paymentField, values.paymentLabel.trim());
+            }
         });
     }
 

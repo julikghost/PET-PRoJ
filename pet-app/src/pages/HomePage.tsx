@@ -33,7 +33,18 @@ export function HomePage (): JSX.Element {
                     backdropFilter: 'blur(10px)',
                 }}
             >
-                <BrandLogo height={120} />
+                <div
+                    style={{
+                        /* Wide frame ~like the welcome card (screenshot); scales with card width */
+                        width: 'min(90%, 480px)',
+                        aspectRatio: '2.35 / 1',
+                        flexShrink: 0,
+                        lineHeight: 0,
+                        margin: '0 auto',
+                    }}
+                >
+                    <BrandLogo fitContainer />
+                </div>
                 <h1
                     style={{
                         margin: 0,
@@ -59,7 +70,12 @@ export function HomePage (): JSX.Element {
                 >
                     {HOME_SUBHEADLINE_EN}
                 </h3>
-                <Button type="primary" size="large" onClick={() => navigate('/login')}>
+                <Button
+                    type="primary"
+                    size="large"
+                    data-testid="pet-home-sign-in"
+                    onClick={() => navigate('/login')}
+                >
                     Sign in
                 </Button>
             </Flex>

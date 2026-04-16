@@ -1,9 +1,11 @@
 /**
  * App facade: composes Login, Reports, and sidebar; opens base URL and asserts URL.
  */
+import { randomUUID } from 'node:crypto';
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { config } from '../config-logistics';
+import { MENU_ITEM } from '../utils/constants';
 import { Login } from './Login';
 import { Reports } from './Reports';
 import { PetMovers } from './PetMovers';
@@ -98,6 +100,103 @@ export class LogisticsApp {
     async clearPetLogisticsData (): Promise<void> {
         await test.step('Clear PET logistics local data', async () => {
             await this.page.evaluate(() => localStorage.removeItem('pet-logistics-v1'));
+        });
+    }
+
+    /** Clears PetMovers directory storage (`pet-movers-v1`). */
+    async clearPetMoversStorage (): Promise<void> {
+        await test.step('Clear PET PetMovers local data', async () => {
+            await this.page.evaluate(() => localStorage.removeItem('pet-movers-v1'));
+        });
+    }
+
+    /**
+     * PetAdmin: open PetMovers and create an active PetMover named `petmover-<uuid>` (PetShipping “PetMover” field).
+     * Returns `name` for the ship form and `code` for teardown via {@link deletePetMoverByCode}.
+     */
+    async createPetMoverForPetShippingPrecondition (): Promise<{ name: string; code: string }> {
+        return await test.step('Precondition: PetMover petmover-<uuid> for Pet ship', async () => {
+            const uuid = randomUUID();
+            const name = `petmover-${uuid}`;
+            const code = `PM${uuid.replace(/-/g, '').slice(0, 16)}`;
+            await this.navigationSidebar.clickMenuItem(MENU_ITEM.PET_MOVERS);
+            await this.petMovers.createActivePetMover({ name, code });
+
+            return { name, code };
+        });
+    }
+
+    /** PetAdmin: PetMovers → delete row by `code` (confirm + toast). */
+    async deletePetMoverByCode (code: string): Promise<void> {
+        await test.step(`Teardown: delete PetMover ${code}`, async () => {
+            await this.navigationSidebar.clickMenuItem(MENU_ITEM.PET_MOVERS);
+            await this.petMovers.expectLoaded();
+            await this.petMovers.deletePetMoverAndConfirm(code);
+        });
+    }
+
+    /**
+     * Best-effort cleanup after E2E (order: booking → pet ship → points → pet mover).
+     * Ignores missing rows / errors so `finally` stays safe.
+     */
+    async teardownPetE2eData (opts: {
+        bookingRef?: string;
+        petShipRef?: string;
+        pointCodes?: string[];
+        /** Delete one PetMover by code (legacy). */
+        petMoverCode?: string;
+        /** Delete several PetMovers by code. */
+        petMoverCodes?: string[];
+    }): Promise<void> {
+        await test.step('Teardown: E2E booking / pet ship / points / pet mover', async () => {
+            const { bookingRef, petShipRef, pointCodes = [], petMoverCode, petMoverCodes = [] } = opts;
+            if (bookingRef) {
+                try {
+                    await this.navigationSidebar.clickMenuItem(MENU_ITEM.BOOKING);
+                    await this.booking.expectLoaded();
+                    const del = this.page.getByTestId(`booking-delete-${bookingRef}`);
+                    if (await del.isVisible().catch(() => false)) {
+                        await this.booking.clickDelete(bookingRef);
+                        await this.booking.confirmDeleteInDialog();
+                    }
+                } catch {
+                    /* ignore */
+                }
+            }
+            if (petShipRef) {
+                try {
+                    await this.navigationSidebar.clickMenuItem(MENU_ITEM.PET_SHIPPING);
+                    await this.petShipping.expectLoaded();
+                    const del = this.page.getByTestId(`schedule-delete-${petShipRef}`);
+                    if (await del.isVisible().catch(() => false)) {
+                        await this.petShipping.clickDelete(petShipRef);
+                        await this.petShipping.confirmDeleteInDialog();
+                    }
+                } catch {
+                    /* ignore */
+                }
+            }
+            for (const code of pointCodes) {
+                try {
+                    await this.navigationSidebar.clickMenuItem(MENU_ITEM.POINTS);
+                    await this.points.expectLoaded();
+                    const del = this.page.getByTestId(`point-delete-${code}`);
+                    if (await del.isVisible().catch(() => false)) {
+                        await this.points.clickDelete(code);
+                        await this.points.confirmDeleteInDialog();
+                    }
+                } catch {
+                    /* ignore */
+                }
+            }
+            const moverCodes = [...new Set([...petMoverCodes, ...(petMoverCode ? [petMoverCode] : [])])];
+            for (const code of moverCodes) {
+                try {
+                    await this.deletePetMoverByCode(code);
+                } catch {
+                    /* ignore */
+                }
+            }
         });
     }
 

@@ -1,4 +1,4 @@
-/** Admin role name in PET UI (carriers-style admin area). */
+/** Admin role name in PET UI (PetMovers admin area). */
 export const ROLE_PET_ADMIN = 'PetAdmin' as const;
 
 export const ROLE_PET_USER = 'PetUser' as const;
@@ -42,4 +42,9 @@ export function isPetAdmin (): boolean {
 
 export function isPetAccountant (): boolean {
     return getAuthSession()?.role === ROLE_PET_ACCOUNTANT;
+}
+
+/** Clear PET session (localStorage). Call before navigating to `/login`. */
+export function signOut (): void {
+    localStorage.removeItem('pet-auth');
 }

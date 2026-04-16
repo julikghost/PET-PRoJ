@@ -1,14 +1,49 @@
 """
-PET logistics — GraphQL contract aligned with the PET UI data model.
+PET logistics — GraphQL contract aligned with the PET UI data model (`src/types/petLogistics.ts`).
 
-- Operational data (points → pet ships → bookings) is persisted in the browser
-  (`localStorage`, see `PetLogisticsContext`) in the demo app; a production API
-  would implement these types.
-- Reports email mutation matches `ReportsPage` and the Playwright Reports flow.
+- **Points → pet ships → bookings** live in `localStorage` key `pet-logistics-v1` (demo).
+- **Pet movers** directory uses `pet-movers-v1` (name, code, active, tariff `currency`, optional `cars` / `drivers` text; no region).
+- Pet ship **currency** matches the selected Pet Mover; **cars** / **drivers** are copied from that mover when the ship is saved (snapshot on the ship).
+- Booking **petLabels** are **species** names (English catalog), not pet names.
+- **Billing** on bookings is derived from the pet ship tariff for Reports (`cur-eur` / `cur-usd` mapping).
+- Reports email mutation matches `ReportsPage` and Playwright (`EmailTicketsReport`).
 """
 schema {
   query: Query
   mutation: Mutation
+}
+
+# --- Shared enums ---
+
+"""EUR / USD base rates for pricing (pet ship + booking snapshot)."""
+enum TariffCurrency {
+  EUR
+  USD
+}
+
+enum PetShipStatus {
+  PLANNED
+  ACTIVE
+  DONE
+}
+
+"""Same semantics as UI / reports options: `card`, `cash`, `petpay`."""
+enum BookingPaymentMethod {
+  CARD
+  CASH
+  PETPAY
+}
+
+"""Reports filter currency ids: `cur-eur`, `cur-usd` (JSON) ↔ enum in API layer."""
+enum BillingCurrency {
+  CUR_EUR
+  CUR_USD
+}
+
+enum NetworkPointKind {
+  HUB
+  STOP
+  AIRPORT
 }
 
 # --- Read models ---
@@ -17,10 +52,12 @@ type Query {
   """Health / portfolio stub."""
   _petHealth: String!
   points: [NetworkPoint!]!
+  petMovers: [PetMover!]!
   petShips: [PetShip!]!
   bookings: [PetBooking!]!
   petShip(id: ID!): PetShip
   networkPoint(id: ID!): NetworkPoint
+  petMover(id: ID!): PetMover
 }
 
 type NetworkPoint {
@@ -31,10 +68,16 @@ type NetworkPoint {
   kind: NetworkPointKind!
 }
 
-enum NetworkPointKind {
-  HUB
-  STOP
-  AIRPORT
+"""Pet mover directory (PetAdmin). Tariff currency applies to new/updated pet ships."""
+type PetMover {
+  id: ID!
+  name: String!
+  code: String!
+  active: Boolean!
+  currency: TariffCurrency!
+  """Optional free text; copied onto pet ships when saved."""
+  cars: String
+  drivers: String
 }
 
 type PetShip {
@@ -44,14 +87,13 @@ type PetShip {
   toPoint: NetworkPoint!
   departure: String!
   arrival: String!
+  """Display name of the mover (matches `PetMover.name` in the directory)."""
   petMover: String!
+  currency: TariffCurrency!
+  """Snapshot from Pet Mover at save; omit if empty."""
+  cars: String
+  drivers: String
   status: PetShipStatus!
-}
-
-enum PetShipStatus {
-  PLANNED
-  ACTIVE
-  DONE
 }
 
 type PetBooking {
@@ -59,8 +101,13 @@ type PetBooking {
   refCode: String!
   petShip: PetShip!
   date: String!
-  petLabel: String!
+  """Species labels (English), from booking catalog."""
+  petLabels: [String!]!
   weightKg: Float!
+  price: Float!
+  currency: TariffCurrency!
+  paymentMethod: BookingPaymentMethod!
+  billingCurrency: BillingCurrency!
 }
 
 # --- Writes (intended backend shape) ---
@@ -71,6 +118,10 @@ type Mutation {
   createNetworkPoint(input: NetworkPointInput!): NetworkPointMutationPayload!
   updateNetworkPoint(id: ID!, input: NetworkPointInput!): NetworkPointMutationPayload!
   deleteNetworkPoint(id: ID!): NetworkPointMutationPayload!
+
+  createPetMover(input: PetMoverInput!): PetMoverMutationPayload!
+  updatePetMover(id: ID!, input: PetMoverInput!): PetMoverMutationPayload!
+  deletePetMover(id: ID!): PetMoverMutationPayload!
 
   createPetShip(input: PetShipInput!): PetShipMutationPayload!
   updatePetShip(id: ID!, input: PetShipInput!): PetShipMutationPayload!
@@ -88,6 +139,15 @@ input NetworkPointInput {
   kind: NetworkPointKind!
 }
 
+input PetMoverInput {
+  name: String!
+  code: String!
+  active: Boolean!
+  currency: TariffCurrency!
+  cars: String
+  drivers: String
+}
+
 input PetShipInput {
   refCode: String!
   fromPointId: ID!
@@ -95,6 +155,9 @@ input PetShipInput {
   departure: String!
   arrival: String!
   petMover: String!
+  currency: TariffCurrency!
+  cars: String
+  drivers: String
   status: PetShipStatus!
 }
 
@@ -102,13 +165,20 @@ input PetBookingInput {
   refCode: String!
   petShipId: ID!
   date: String!
-  petLabel: String!
+  petLabels: [String!]!
   weightKg: Float!
+  paymentMethod: BookingPaymentMethod!
 }
 
 type NetworkPointMutationPayload {
   ok: Boolean!
   point: NetworkPoint
+  error: String
+}
+
+type PetMoverMutationPayload {
+  ok: Boolean!
+  petMover: PetMover
   error: String
 }
 
@@ -131,7 +201,7 @@ input EmailTicketsReportReq {
   targetColumnForDateSearch: String!
   fromDate: String!
   toDate: String!
-  carrierIds: [ID!]!
+  petMoverIds: [ID!]!
   emailForSendReport: String!
   currency: [String!]
 }

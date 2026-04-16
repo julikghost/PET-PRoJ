@@ -1,90 +1,92 @@
-/**
- * PetShipping CRUD: requires at least two Points first (shared store).
- */
 import { test, expect } from '@playwright/test';
 import { MENU_ITEM } from '../../utils/constants';
 import { config } from '../../config-logistics';
 import { LogisticsApp } from '../../pageObjects/LogisticsApp';
 import { petShipping as petShippingText } from '../../utils/text';
 import { points as pointsText } from '../../utils/text';
+import { getCurrentAndTomorrowDateTimes } from '../../utils/date';
 
-const { uiUsername, password } = config;
+const { adminUsername, adminPassword } = config;
 
 test.describe('PetShipping', () => {
     test('create pet ship after two points, then update and delete', async ({ page }) => {
-        test.skip(!uiUsername || !password, 'Set LOGISTICS_UI_USER_NAME and LOGISTICS_PASSWORD');
+        test.skip(
+            !adminUsername || !adminPassword,
+            'Set LOGISTICS_ADMIN_USER_NAME and LOGISTICS_ADMIN_PASSWORD (PetMover precondition + Points/PetShipping).'
+        );
 
         const ts = Date.now();
-        const codeA = `E2E-A-${ts}`;
-        const codeB = `E2E-B-${ts}`;
-        const fromLabel = `E2E Alpha (${codeA})`;
-        const toLabel = `E2E Beta (${codeB})`;
         const shipRef = `E2E-PS-${ts}`;
+        const { currentDateTime, tomorrowDateTime } = getCurrentAndTomorrowDateTimes();
+        const departure = currentDateTime;
+        const arrival = tomorrowDateTime;
+        let pmCode: string | undefined;
+        let pm2Code: string | undefined;
+        let codeFrom: string | undefined;
+        let codeTo: string | undefined;
 
         const app = new LogisticsApp(page);
-        await app.openLogisticsApp();
-        await app.loginAsPetUser();
-        await app.clearPetLogisticsData();
+        try {
+            await app.openLogisticsApp();
+            await app.loginAsPetAdmin();
+            await app.clearPetLogisticsData();
+            await app.clearPetMoversStorage();
 
-        await app.navigationSidebar.clickMenuItem(MENU_ITEM.POINTS);
-        const pt = app.points;
-        await pt.clickAdd();
-        await pt.fillForm({
-            code: codeA,
-            name: 'E2E Alpha',
-            city: 'CityA',
-            kindLabel: pointsText.kindHub,
-        });
-        await pt.saveModal();
-        await expect(page.getByText(pointsText.toastCreated)).toBeVisible();
+            const pm = await app.createPetMoverForPetShippingPrecondition();
+            const pm2 = await app.createPetMoverForPetShippingPrecondition();
+            pmCode = pm.code;
+            pm2Code = pm2.code;
 
-        await pt.clickAdd();
-        await pt.fillForm({
-            code: codeB,
-            name: 'E2E Beta',
-            city: 'CityB',
-            kindLabel: pointsText.kindHub,
-        });
-        await pt.saveModal();
-        await expect(page.getByText(pointsText.toastCreated)).toBeVisible();
+            await app.navigationSidebar.clickMenuItem(MENU_ITEM.POINTS);
+            const routes = await app.points.createTwoDistinctPointsForRoutes({
+                suffix: String(ts),
+                from: { name: 'E2E Alpha', city: 'Amsterdam', kindLabel: pointsText.kindHub },
+                to: { name: 'E2E Beta', city: 'Zurich', kindLabel: pointsText.kindHub },
+            });
+            codeFrom = routes.codeFrom;
+            codeTo = routes.codeTo;
+            const { fromLabel, toLabel } = routes;
 
-        await app.navigationSidebar.clickMenuItem(MENU_ITEM.PET_SHIPPING);
-        const ship = app.petShipping;
-        await ship.expectLoaded();
+            await app.navigationSidebar.clickMenuItem(MENU_ITEM.PET_SHIPPING);
+            const ship = app.petShipping;
 
-        await ship.clickAdd();
-        await ship.fillForm({
-            refCode: shipRef,
-            fromLabel,
-            toLabel,
-            departure: '2026-06-01 08:00',
-            arrival: '2026-06-01 20:00',
-            petMover: 'PetMover E2E',
-            statusLabel: petShippingText.statusPlanned,
-        });
-        await ship.saveModal();
-        await expect(page.getByText(petShippingText.toastCreated)).toBeVisible();
+            await ship.createPetShip({
+                refCode: shipRef,
+                fromLabel,
+                toLabel,
+                departure,
+                arrival,
+                petMover: `${pm.name} (${pm.code})`,
+                statusLabel: petShippingText.statusPlanned,
+            });
 
-        await ship.expectRowContains(shipRef);
-        await ship.expectRowContains('E2E Alpha');
+            await ship.expectRowContains(shipRef);
+            await ship.expectRowContains('E2E Alpha');
 
-        await ship.clickEdit(shipRef);
-        await ship.fillForm({
-            refCode: shipRef,
-            fromLabel,
-            toLabel,
-            departure: '2026-06-01 08:00',
-            arrival: '2026-06-01 20:00',
-            petMover: 'PetMover E2E v2',
-            statusLabel: petShippingText.statusActive,
-        });
-        await ship.saveModal();
-        await expect(page.getByText(petShippingText.toastUpdated)).toBeVisible();
-        await ship.expectRowContains('PetMover E2E v2');
+            await ship.clickEdit(shipRef);
+            await ship.fillForm({
+                refCode: shipRef,
+                fromLabel,
+                toLabel,
+                departure,
+                arrival,
+                petMover: `${pm2.name} (${pm2.code})`,
+                statusLabel: petShippingText.statusPlanned,
+            });
+            await ship.saveModal();
+            await expect(page.getByText(petShippingText.toastUpdated)).toBeVisible();
+            await ship.expectRowContains(`${pm2.name} (${pm2.code})`);
 
-        await ship.clickDelete(shipRef);
-        await ship.confirmDeleteInDialog();
-        await expect(page.getByText(petShippingText.toastDeleted)).toBeVisible();
-        await ship.expectNoRowContains(shipRef);
+            await ship.clickDelete(shipRef);
+            await ship.confirmDeleteInDialog();
+            await expect(page.getByText(petShippingText.toastDeleted)).toBeVisible();
+            await ship.expectNoRowContains(shipRef);
+        } finally {
+            await app.teardownPetE2eData({
+                petShipRef: shipRef,
+                pointCodes: [codeFrom, codeTo].filter(Boolean) as string[],
+                petMoverCodes: [pmCode, pm2Code].filter(Boolean) as string[],
+            });
+        }
     });
 });

@@ -1,48 +1,123 @@
-# PET logistics UI
+# PET Logistics UI + E2E
 
-Minimal React + Ant Design app used to exercise the Playwright suite locally: login flow, sidebar **Reports**, form fields, and `POST /api/graphql` handled by the Vite dev server.
+This repository contains two connected parts:
 
-**GraphQL schema (SDL):** [`graphql/schema.graphql`](graphql/schema.graphql) — intended contract for the report-email mutation (`EmailTicketsReport` / `emailTicketsReport`); the Vite stub does not run a full GraphQL engine and returns a fixed JSON body for E2E.
+- `pet-app/`: a local React + Vite demo UI for pet logistics flows.
+- Repo root Playwright suite (`tests/`, `pageObjects/`): end-to-end tests that run against this UI.
 
-UI colors use the **[open-color](https://github.com/yeun/open-color)** palette (see `src/theme/palette.ts`), not Ant Design’s default blue theme tokens.
+The app is intentionally test-friendly: role-based login, stable `data-testid` selectors, local storage backed data, and a Vite API stub for `POST /api/graphql`.
 
-## Run
+## What the PET app includes
+
+- **Operational modules**: Points, Pet Shipping (movement schedule), Booking.
+- **Admin module**: Pet Movers directory.
+- **Reports module**: email report flow through GraphQL endpoint.
+- **Roles**:
+  - `PetUser`: operational pages.
+  - `PetAdmin`: operational pages + Pet Movers + Reports.
+  - `PetAccountant`: Reports only.
+- **Storage model**:
+  - `pet-logistics-v1` for points, pet ships, bookings.
+  - `pet-movers-v1` for pet movers.
+
+GraphQL contract lives in `pet-app/graphql/schema.graphql`. The dev server uses a lightweight stub (not a full GraphQL runtime) to support E2E checks.
+
+## Project structure
+
+- `pet-app/src/pages/`: UI pages (`PointsPage`, `MovementSchedulePage`, `BookingPage`, `PetMoversPage`, `ReportsPage`).
+- `pet-app/src/context/PetLogisticsContext.tsx`: local storage state, CRUD rules, cross-entity validations.
+- `pageObjects/`: Playwright page objects used by tests.
+- `tests/auth/`: session bootstrap project.
+- `tests/logistics/`: business flow specs.
+
+## Local run (UI only)
+
+From `pet-app/`:
 
 ```bash
-cd pet-app
 cp .env.example .env
 npm install
 npm run dev
 ```
 
-Default URL: `http://localhost:5173/`. If you see **Port 5173 is already in use**, either stop the old dev server (see below) or set `PET_DEV_PORT` (e.g. `5174`) in the shell **and** the same host/port in the repo root `LOGISTICS_BASE_CLIENT_URL` / `LOGISTICS_BASE_API_URL`.
+Default URL is `http://localhost:5173/`.
 
-**Windows — free port 5173:**
+- If `5173` is busy, set `PET_DEV_PORT` (for example `5174`) before `npm run dev`.
+- Vite has `strictPort: false`, so it can auto-pick the next free port.
+
+Windows port cleanup example:
 
 ```powershell
 netstat -ano | findstr :5173
 taskkill /PID <pid_from_last_column> /F
 ```
 
-With `strictPort: false`, Vite may start on **5174**; use the URL printed in the terminal for `.env`.
+## E2E setup
 
-## Wire e2e (repo root `.env`)
+1. In repo root, copy `.env.example` to `.env`.
+2. Keep credentials aligned between:
+   - root `.env` (`LOGISTICS_*` variables),
+   - `pet-app/.env` (`VITE_PET_*` variables).
+3. Make sure base URLs point to the running PET app:
+   - `LOGISTICS_BASE_CLIENT_URL=http://localhost:5173/`
+   - `LOGISTICS_BASE_API_URL=http://localhost:5173/api`
+4. Recommended for deterministic date checks: `E2E_TIME_ZONE=UTC`.
 
-Use the same user/password as in `pet-app/.env`:
+## Run Playwright tests
 
-- `LOGISTICS_BASE_CLIENT_URL=http://localhost:5173/`
-- `LOGISTICS_BASE_API_URL=http://localhost:5173/api`
-- `LOGISTICS_UI_USER_NAME` = `VITE_PET_USER`
-- `LOGISTICS_PASSWORD` = `VITE_PET_PASSWORD`
-- `E2E_LOGIN_USER_FIELD_NAME=identifier`
-- `E2E_TIME_ZONE=UTC` (recommended so PET date math matches `utils/date.ts`)
-
-Optional: delete `storageState/session.json`, then from repo root:
+From repo root:
 
 ```bash
-npx playwright test --project=logistics_session --project=logistics_web
+npm install
+npm install --prefix pet-app
 ```
 
-## Reports fixture
+Then use one of:
 
-Copy `e2e-fixtures.sample.json` to `tests/logistics/fixtures.local.json` (gitignored) so `reports.spec.ts` is not skipped.
+```bash
+npm run pet:dev
+npm run e2e
+```
+
+Useful commands:
+
+- Full suite with setup + business tests: `npm run e2e`
+- Logistics tests only: `npm run e2e-logistics`
+- Session setup only: `npx playwright test --project=logistics_session`
+- One spec example: `npx playwright test tests/logistics/booking.spec.ts --project=logistics_web`
+
+## What is covered by tests
+
+- `tests/auth/logisticsSession.setup.ts`
+  - logs in once and persists `storageState/session.json`.
+- `tests/logistics/00-points.spec.ts`
+  - CRUD for points (create, update, delete).
+- `tests/logistics/petMovers.spec.ts`
+  - CRUD for pet movers with admin credentials.
+- `tests/logistics/petShipping.spec.ts`
+  - creates pet movers and points, then CRUD for pet shipping rows.
+  - uses dynamic dates: today and tomorrow.
+- `tests/logistics/booking.spec.ts`
+  - creates preconditions (pet mover, points, pet ship), then booking CRUD.
+  - uses dynamic dates: today and tomorrow.
+- `tests/logistics/reports.spec.ts`
+  - fills filters, sends report by email, asserts intercepted GraphQL payload and saved artifacts.
+
+Playwright runs with `workers: 1` in `playwright.config.ts`, which keeps shared local storage flows deterministic.
+
+## Reports fixture (required for reports.spec.ts)
+
+`reports.spec.ts` is skipped unless fixture data is provided.
+
+Use one option:
+
+- `LOGISTICS_REPORT_FIXTURES_JSON` environment variable, or
+- local gitignored file `tests/logistics/fixtures.local.json`.
+
+Starter template: `tests/logistics/fixtures.example.json`.
+
+## Common issues
+
+- **Port mismatch**: if PET starts on `5174`, update root `.env` URLs accordingly.
+- **Stale session**: delete `storageState/session.json` and rerun `logistics_session`.
+- **Reports skipped**: add `fixtures.local.json` or `LOGISTICS_REPORT_FIXTURES_JSON`.

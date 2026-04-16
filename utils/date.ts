@@ -2,11 +2,57 @@
  * Date utilities for report checks: local calendar day from ISO, current-month ranges (local and UTC)
  * using `E2E_TIME_ZONE` from config.
  */
-import { parseISO, format, startOfMonth, endOfMonth } from 'date-fns';
+import { addDays, parseISO, format, startOfMonth, endOfMonth } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { config } from '../config-logistics';
 
 const defaultTimeZone = config.timeZone || 'UTC';
+
+export function getTodayAndTomorrowDays (timeZone: string = config.timeZone || defaultTimeZone): {
+    todayDay: string;
+    tomorrowDay: string;
+} {
+    try {
+        const zonedToday = toZonedTime(new Date(), timeZone);
+        const zonedTomorrow = addDays(zonedToday, 1);
+
+        return {
+            todayDay: format(zonedToday, 'yyyy-MM-dd'),
+            tomorrowDay: format(zonedTomorrow, 'yyyy-MM-dd'),
+        };
+    } catch {
+        const today = new Date();
+        const tomorrow = addDays(today, 1);
+
+        return {
+            todayDay: format(today, 'yyyy-MM-dd'),
+            tomorrowDay: format(tomorrow, 'yyyy-MM-dd'),
+        };
+    }
+}
+
+export function getCurrentAndTomorrowDateTimes (timeZone: string = config.timeZone || defaultTimeZone): {
+    currentDateTime: string;
+    tomorrowDateTime: string;
+} {
+    try {
+        const zonedNow = toZonedTime(new Date(), timeZone);
+        const zonedTomorrow = addDays(zonedNow, 1);
+
+        return {
+            currentDateTime: format(zonedNow, 'yyyy-MM-dd HH:mm'),
+            tomorrowDateTime: format(zonedTomorrow, 'yyyy-MM-dd HH:mm'),
+        };
+    } catch {
+        const now = new Date();
+        const tomorrow = addDays(now, 1);
+
+        return {
+            currentDateTime: format(now, 'yyyy-MM-dd HH:mm'),
+            tomorrowDateTime: format(tomorrow, 'yyyy-MM-dd HH:mm'),
+        };
+    }
+}
 
 export function toLocalDay (
     isoString: string,

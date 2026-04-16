@@ -13,7 +13,6 @@ import './index.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
         <div style={{ position: 'relative', minHeight: '100vh', isolation: 'isolate' }}>
-            <AppBackground />
             <div style={{ position: 'relative', zIndex: 1 }}>
                 <ConfigProvider
                     theme={{
@@ -34,9 +33,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                 >
                     <AntApp>
                         <BrowserRouter>
-                            <PetLogisticsProvider>
-                                <App />
-                            </PetLogisticsProvider>
+                            <AppBackground />
+                            <div style={{ position: 'relative', zIndex: 2 }}>
+                                <PetLogisticsProvider>
+                                    <App />
+                                </PetLogisticsProvider>
+                            </div>
                         </BrowserRouter>
                         <Toaster richColors position="top-center" closeButton />
                     </AntApp>

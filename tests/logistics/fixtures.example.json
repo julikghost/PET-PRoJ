@@ -1,6 +1,6 @@
 {
-  "_comment": "Sample report fixtures: copy to fixtures.local.json or pass via LOGISTICS_REPORT_FIXTURES_JSON; values must match your environment. After load, apply E2E_FIXTURE_SUBSTITUTIONS_JSON if needed.",
-  "reportCarrier": "<exact PetMover option label as shown in Reports filter>",
+  "_comment": "Copy to fixtures.local.json. Optional petMoverSeed; if omitted, seed is derived from reportPetMover as \"Name (CODE)\" and petMoverIdsExpected[0] for id.",
+  "reportPetMover": "<exact PetMover option label as shown in Reports filter>",
   "uiPaymentMethods": ["<Payment method A>", "<Payment method B>", "<Payment method C>"],
   "uiCurrencies": ["<Currency A>", "<Currency B>"],
   "paymentCodeToName": {
@@ -12,7 +12,14 @@
     "<currency-id-1>": "<Currency A>",
     "<currency-id-2>": "<Currency B>"
   },
-  "carrierIdsExpected": ["<carrier-id>"],
+  "petMoverIdsExpected": ["<pet-mover-id>"],
+  "petMoverSeed": {
+    "id": "<same-as-petMoverIdsExpected-0>",
+    "name": "<Name>",
+    "code": "<CODE>",
+    "active": true,
+    "currency": "EUR"
+  },
   "graphql": {
     "operationName": "<ReportMutationName>",
     "queryContains": "<substring of GraphQL field or operation body>",

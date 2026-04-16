@@ -25,17 +25,26 @@ export class Login {
 
     async clickLogin (): Promise<void> {
         await test.step('Open authentication flow', async () => {
-            const btn = this.page.getByRole('button', { name: new RegExp(loginButton) });
+            const petEntry = this.page.getByTestId('pet-home-sign-in');
+            if (await petEntry.count()) {
+                await expect(petEntry).toBeVisible();
+                await petEntry.click();
+                await this.page.waitForURL(/\/login/, { timeout: 15000 });
 
+                return;
+            }
+
+            const btn = this.page.getByRole('button', { name: new RegExp(loginButton) }).first();
             await expect(btn).toBeVisible();
             await btn.click();
 
             const waiters: Array<Promise<unknown>> = [
                 this.page
-                    .locator('form[action*="/login"][method="POST"]')
+                    .locator('form[action*="/login"]')
                     .first()
                     .waitFor({ timeout: 15000 })
                     .catch(() => {}),
+                this.page.getByTestId('pet-login-form').waitFor({ timeout: 15000 }).catch(() => {}),
             ];
             if (loginUrlGlob) {
                 waiters.unshift(
@@ -54,14 +63,15 @@ export class Login {
             if (!email || !password) {
                 throw new Error('signInPetApp: email and password are required.');
             }
-            const pwForm = this.page.locator('form[action*="/login"][method="POST"]').first();
+            const pwForm = this.page.getByTestId('pet-login-form');
             await expect(pwForm).toBeVisible();
 
-            await pwForm.locator('input[name="identifier"]').fill(email);
-            await pwForm.locator('input[name="password"]').fill(password);
+            // Ant Design Form often omits `name` on the native input; label / role are stable.
+            await pwForm.getByLabel('Email').fill(email);
+            await pwForm.getByLabel('Password').fill(password);
 
-            const submitBtn = pwForm.getByRole('button', { name: /Sign in/i });
-            await expect(submitBtn).toBeEnabled();
+            const submitBtn = pwForm.getByTestId('pet-login-submit');
+            await expect(submitBtn).toBeVisible();
             await submitBtn.click();
         });
     }
@@ -77,7 +87,7 @@ export class Login {
                 );
             }
 
-            const pwForm = this.page.locator('form[action*="/login"][method="POST"]').last();
+            const pwForm = this.page.locator('form[action*="/login"]').last();
             await expect(pwForm).toBeVisible();
 
             await pwForm.locator(`input[name="${loginUserFieldName}"]`).fill(email);

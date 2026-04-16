@@ -1,8 +1,3 @@
-/**
- * Types and loading of report JSON fixtures (from env or `fixtures.local.json`), with optional
- * string substitutions via `E2E_FIXTURE_SUBSTITUTIONS_JSON` after parsing.
- * Expectations live outside the repo (set `LOGISTICS_REPORT_FIXTURES_JSON` or use gitignored local file).
- */
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -22,13 +17,26 @@ export interface LogisticsReportGraphqlExpected {
     };
 }
 
+/** Seed row for PET `pet-movers-v1` so Reports PetMover select has a matching option (same shape as pet-app). */
+export interface LogisticsReportPetMoverSeed {
+    id: string;
+    name: string;
+    code: string;
+    active?: boolean;
+    currency?: 'EUR' | 'USD';
+    cars?: string;
+    drivers?: string;
+}
+
 export interface LogisticsReportFixtures {
-    reportCarrier: string;
+    reportPetMover: string;
     uiPaymentMethods: string[];
     uiCurrencies: string[];
     paymentCodeToName: Record<string, string>;
     currencyIdToName: Record<string, string>;
-    carrierIdsExpected?: string[];
+    petMoverIdsExpected?: string[];
+    /** Prefer explicit seed; else derived from `reportPetMover` + `petMoverIdsExpected[0]` in tests. */
+    petMoverSeed?: LogisticsReportPetMoverSeed;
     graphql: LogisticsReportGraphqlExpected;
 }
 

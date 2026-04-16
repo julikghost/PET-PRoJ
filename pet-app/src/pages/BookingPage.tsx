@@ -2,10 +2,25 @@ import { useCallback, useMemo, useState } from 'react';
 import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { toast } from 'sonner';
+import { toast } from '../petToast';
+import { BOOKING_PET_SPECIES } from '../data/bookingPets';
+import { REPORT_CURRENCY_OPTIONS, REPORT_PAYMENT_OPTIONS } from '../data/reportsAndBookingOptions';
 import { usePetLogistics } from '../context/PetLogisticsContext';
 import { petTheme } from '../theme/palette';
-import type { BookingRecord } from '../types/petLogistics';
+import type { BookingBillingCurrency, BookingPaymentMethod, BookingRecord } from '../types/petLogistics';
+import { BASE_RATE, computeBookingPrice, tripDayCount } from '../utils/pricing';
+
+function paymentMethodLabel (m: BookingPaymentMethod): string {
+    const o = REPORT_PAYMENT_OPTIONS.find((x) => x.value === m);
+
+    return o?.label ?? m;
+}
+
+function billingCurrencyLabel (c: BookingBillingCurrency): string {
+    const o = REPORT_CURRENCY_OPTIONS.find((x) => x.value === c);
+
+    return o?.label ?? c;
+}
 
 export function BookingPage (): JSX.Element {
     const {
@@ -22,8 +37,9 @@ export function BookingPage (): JSX.Element {
         refCode: string;
         petShipId: string;
         date: dayjs.Dayjs;
-        petLabel: string;
+        petLabels: string[];
         weightKg: number;
+        paymentMethod: BookingPaymentMethod;
     }>();
 
     const shipOptionsForModal = useMemo(() => {
@@ -38,6 +54,11 @@ export function BookingPage (): JSX.Element {
         return avail.map((s) => ({ value: s.id, label: petShipOptionLabel(s) }));
     }, [bookablePetShips, editing, petShips, petShipOptionLabel]);
 
+    const petSpeciesOptions = useMemo(
+        () => BOOKING_PET_SPECIES.map((s) => ({ value: s, label: s })),
+        []
+    );
+
     const openCreate = useCallback(() => {
         if (bookablePetShips.length === 0) {
             toast.error('Add points, then create a planned or active pet ship first');
@@ -50,8 +71,9 @@ export function BookingPage (): JSX.Element {
             refCode: '',
             petShipId: undefined,
             date: dayjs().add(1, 'day'),
-            petLabel: '',
+            petLabels: [],
             weightKg: 5,
+            paymentMethod: 'card',
         });
         setModalOpen(true);
     }, [bookablePetShips.length, form]);
@@ -63,8 +85,9 @@ export function BookingPage (): JSX.Element {
                 refCode: record.refCode,
                 petShipId: record.petShipId,
                 date: dayjs(record.date, 'YYYY-MM-DD'),
-                petLabel: record.petLabel,
+                petLabels: record.petLabels,
                 weightKg: record.weightKg,
+                paymentMethod: record.paymentMethod,
             });
             setModalOpen(true);
         },
@@ -80,16 +103,18 @@ export function BookingPage (): JSX.Element {
                       refCode: v.refCode,
                       petShipId: v.petShipId,
                       date: dateStr,
-                      petLabel: v.petLabel,
+                      petLabels: v.petLabels,
                       weightKg: v.weightKg,
+                      paymentMethod: v.paymentMethod,
                       id: editing.id,
                   }
                 : {
                       refCode: v.refCode,
                       petShipId: v.petShipId,
                       date: dateStr,
-                      petLabel: v.petLabel,
+                      petLabels: v.petLabels,
                       weightKg: v.weightKg,
+                      paymentMethod: v.paymentMethod,
                   }
         );
         if (ok) {
@@ -129,8 +154,32 @@ export function BookingPage (): JSX.Element {
                 },
             },
             { title: 'Date', dataIndex: 'date', key: 'date', width: 120 },
-            { title: 'Pet', dataIndex: 'petLabel', key: 'petLabel' },
+            {
+                title: 'Species',
+                key: 'petLabels',
+                render: (_, record) => record.petLabels.join(', '),
+            },
             { title: 'Weight (kg)', dataIndex: 'weightKg', key: 'weightKg', width: 90 },
+            {
+                title: 'Price',
+                key: 'price',
+                width: 120,
+                render: (_, record) => `${record.price.toFixed(2)} ${record.currency}`,
+            },
+            {
+                title: 'Payment',
+                dataIndex: 'paymentMethod',
+                key: 'paymentMethod',
+                width: 90,
+                render: (m: BookingPaymentMethod) => paymentMethodLabel(m),
+            },
+            {
+                title: 'Billing',
+                dataIndex: 'billingCurrency',
+                key: 'billingCurrency',
+                width: 80,
+                render: (c: BookingBillingCurrency) => billingCurrencyLabel(c),
+            },
             {
                 title: 'Actions',
                 key: 'actions',
@@ -212,13 +261,86 @@ export function BookingPage (): JSX.Element {
                             <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
                         </div>
                     </Form.Item>
-                    <Form.Item name="petLabel" label="Pet" rules={[{ required: true }]}>
-                        <Input data-testid="booking-field-pet" />
+                    <Form.Item
+                        name="petLabels"
+                        label="Species"
+                        rules={[
+                            { required: true, message: 'Required' },
+                            { type: 'array', min: 1, message: 'Select at least one species' },
+                        ]}
+                    >
+                        <Select
+                            mode="multiple"
+                            showSearch
+                            optionFilterProp="label"
+                            options={petSpeciesOptions}
+                            placeholder="Select one or more species"
+                            data-testid="booking-field-pet"
+                        />
                     </Form.Item>
                     <Form.Item name="weightKg" label="Weight (kg)" rules={[{ required: true }]}>
                         <div data-testid="booking-field-weight">
                             <InputNumber min={0.5} max={80} step={0.5} style={{ width: '100%' }} />
                         </div>
+                    </Form.Item>
+                    <Form.Item
+                        name="paymentMethod"
+                        label="Payment method"
+                        rules={[{ required: true, message: 'Required' }]}
+                    >
+                        <Select
+                            options={[...REPORT_PAYMENT_OPTIONS]}
+                            data-testid="booking-field-payment"
+                        />
+                    </Form.Item>
+                    <Form.Item dependencies={['petShipId', 'weightKg']} noStyle>
+                        {() => {
+                            const petShipId = form.getFieldValue('petShipId') as string | undefined;
+                            const weightKg = form.getFieldValue('weightKg') as number | undefined;
+                            const ship = petShips.find((s) => s.id === petShipId);
+                            if (
+                                !ship
+                                || weightKg === undefined
+                                || weightKg === null
+                                || Number.isNaN(Number(weightKg))
+                                || Number(weightKg) <= 0
+                            ) {
+                                return null;
+                            }
+                            const w = Number(weightKg);
+                            const days = tripDayCount(ship.departure, ship.arrival);
+                            const price = computeBookingPrice(w, ship.currency, ship.departure, ship.arrival);
+                            const rate = BASE_RATE[ship.currency];
+
+                            const carsLine = ship.cars.trim();
+                            const driversLine = ship.drivers.trim();
+                            const showFleet = Boolean(carsLine || driversLine);
+
+                            return (
+                                <div data-testid="booking-price-line" style={{ marginBottom: 16 }}>
+                                    <div style={{ fontWeight: 600, color: petTheme.text }}>
+                                        Price: {price.toFixed(2)} {ship.currency}
+                                    </div>
+                                    <div style={{ color: petTheme.textMuted, fontSize: 12 }}>
+                                        {w} kg × {rate} × {days} day(s) on selected pet ship
+                                    </div>
+                                    {showFleet ? (
+                                        <div
+                                            data-testid="booking-ship-cars-drivers"
+                                            style={{
+                                                marginTop: 8,
+                                                color: petTheme.textMuted,
+                                                fontSize: 12,
+                                                lineHeight: 1.45,
+                                            }}
+                                        >
+                                            {carsLine ? <div>Cars: {carsLine}</div> : null}
+                                            {driversLine ? <div>Drivers: {driversLine}</div> : null}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            );
+                        }}
                     </Form.Item>
                 </Form>
             </Modal>

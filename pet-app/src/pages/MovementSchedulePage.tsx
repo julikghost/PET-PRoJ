@@ -1,10 +1,25 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Form, Input, Modal, Select, Space, Table, Tag } from 'antd';
+import { Alert, Button, Calendar, DatePicker, Form, Input, Modal, Select, Space, Table, Tag } from 'antd';
+import type { CalendarProps } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { toast } from 'sonner';
+import type { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
+import { toast } from '../petToast';
+import { petMoverSelectOptions, usePetMovers } from '../petMoversStorage';
 import { usePetLogistics } from '../context/PetLogisticsContext';
 import { petTheme } from '../theme/palette';
-import type { PetShipRecord } from '../types/petLogistics';
+import type { PetShipCurrency, PetShipRecord } from '../types/petLogistics';
+
+dayjs.extend(customParseFormat);
+
+const DATETIME_FMT = 'YYYY-MM-DD HH:mm';
+
+function parseDeparture (s: string): Dayjs | null {
+    const d = dayjs(s.trim(), DATETIME_FMT, true);
+
+    return d.isValid() ? d : null;
+}
 
 const STATUS_OPTIONS = [
     { value: 'planned', label: 'Planned' },
@@ -27,12 +42,19 @@ export function MovementSchedulePage (): JSX.Element {
         upsertPetShip,
         deletePetShip,
     } = usePetLogistics();
+    const [petMovers] = usePetMovers();
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<PetShipRecord | null>(null);
     const [form] = Form.useForm<
         Pick<
             PetShipRecord,
-            'refCode' | 'fromPointId' | 'toPointId' | 'departure' | 'arrival' | 'petMover' | 'status'
+            | 'refCode'
+            | 'fromPointId'
+            | 'toPointId'
+            | 'departure'
+            | 'arrival'
+            | 'petMover'
+            | 'status'
         >
     >();
 
@@ -41,9 +63,91 @@ export function MovementSchedulePage (): JSX.Element {
         [points, pointOptionLabel]
     );
 
+    const petMoverOptions = useMemo(() => petMoverSelectOptions(petMovers, 'name'), [petMovers]);
+
+    /** Include legacy `petMover` string if it no longer matches an active row (editing old ships). */
+    const petMoverOptionsForModal = useMemo(() => {
+        const base = petMoverOptions;
+        if (editing?.petMover && !base.some((o) => o.value === editing.petMover)) {
+            return [...base, { value: editing.petMover, label: editing.petMover }];
+        }
+
+        return base;
+    }, [petMoverOptions, editing]);
+
+    const petShipsByDepartureDay = useMemo(() => {
+        const map = new Map<string, PetShipRecord[]>();
+        for (const ship of petShips) {
+            const dep = parseDeparture(ship.departure);
+            if (!dep) {
+                continue;
+            }
+            const key = dep.format('YYYY-MM-DD');
+            const list = map.get(key) ?? [];
+            list.push(ship);
+            map.set(key, list);
+        }
+        for (const [, list] of map) {
+            list.sort((a, b) => {
+                const da = parseDeparture(a.departure);
+                const db = parseDeparture(b.departure);
+
+                return (da?.valueOf() ?? 0) - (db?.valueOf() ?? 0);
+            });
+        }
+
+        return map;
+    }, [petShips]);
+
+    const calendarCellRender: CalendarProps<Dayjs>['cellRender'] = useCallback(
+        (date: Dayjs, info: { type: string }) => {
+            if (info.type !== 'date') {
+                return null;
+            }
+            const key = date.format('YYYY-MM-DD');
+            const dayShips = petShipsByDepartureDay.get(key) ?? [];
+
+            if (dayShips.length === 0) {
+                return null;
+            }
+
+            return (
+                <ul
+                    style={{
+                        listStyle: 'none',
+                        margin: '4px 0 0',
+                        padding: 0,
+                        fontSize: 11,
+                        lineHeight: 1.35,
+                        maxHeight: 72,
+                        overflow: 'auto',
+                    }}
+                >
+                    {dayShips.map((ship) => (
+                        <li key={ship.id} style={{ marginBottom: 2 }}>
+                            <Tag
+                                color={statusColor[ship.status]}
+                                style={{ marginInlineEnd: 4, fontSize: 10, lineHeight: '16px', padding: '0 4px' }}
+                            >
+                                {ship.refCode}
+                            </Tag>
+                            <span style={{ color: petTheme.textMuted }}>{petShipRouteText(ship)}</span>
+                        </li>
+                    ))}
+                </ul>
+            );
+        },
+        [petShipsByDepartureDay, petShipRouteText]
+    );
+
     const openCreate = useCallback(() => {
         if (points.length < 2) {
             toast.error('Create at least two points in Points first');
+
+            return;
+        }
+        if (petMoverOptions.length === 0) {
+            toast.error('Add at least one active PetMover under PetMovers first');
 
             return;
         }
@@ -55,16 +159,17 @@ export function MovementSchedulePage (): JSX.Element {
             toPointId: undefined,
             departure: '',
             arrival: '',
-            petMover: '',
+            petMover: undefined,
             status: 'planned',
         });
         setModalOpen(true);
-    }, [form, points.length]);
+    }, [form, petMoverOptions.length, points.length]);
 
     const openEdit = useCallback(
         (record: PetShipRecord) => {
             setEditing(record);
-            form.setFieldsValue(record);
+            const { currency: _currency, cars: _cars, drivers: _drivers, ...formValues } = record;
+            form.setFieldsValue(formValues);
             setModalOpen(true);
         },
         [form]
@@ -72,17 +177,21 @@ export function MovementSchedulePage (): JSX.Element {
 
     const submitModal = useCallback(async () => {
         const v = await form.validateFields();
+        const mover = petMovers.find((m) => m.name === v.petMover);
+        const currency: PetShipCurrency = mover?.currency === 'USD' ? 'USD' : 'EUR';
+        const cars = (mover?.cars ?? '').trim();
+        const drivers = (mover?.drivers ?? '').trim();
         const ok = upsertPetShip(
             editing
-                ? { ...v, id: editing.id }
-                : v
+                ? { ...v, id: editing.id, currency, cars, drivers }
+                : { ...v, currency, cars, drivers }
         );
         if (ok) {
             toast.success(editing ? 'Pet ship updated' : 'Pet ship created');
             setModalOpen(false);
             setEditing(null);
         }
-    }, [editing, form, upsertPetShip]);
+    }, [editing, form, petMovers, upsertPetShip]);
 
     const requestDelete = useCallback(
         (record: PetShipRecord) => {
@@ -113,7 +222,22 @@ export function MovementSchedulePage (): JSX.Element {
             },
             { title: 'Departure', dataIndex: 'departure', key: 'departure', width: 150 },
             { title: 'Arrival', dataIndex: 'arrival', key: 'arrival', width: 150 },
-            { title: 'PetMover', dataIndex: 'petMover', key: 'petMover' },
+            {
+                title: 'PetMover',
+                dataIndex: 'petMover',
+                key: 'petMover',
+                render: (name: string) => {
+                    const m = petMovers.find((x) => x.name === name);
+
+                    return m ? `${m.name} (${m.code})` : name;
+                },
+            },
+            {
+                title: 'Curr.',
+                dataIndex: 'currency',
+                key: 'currency',
+                width: 64,
+            },
             {
                 title: 'Status',
                 dataIndex: 'status',
@@ -152,7 +276,7 @@ export function MovementSchedulePage (): JSX.Element {
                 ),
             },
         ],
-        [openEdit, petShipRouteText, requestDelete]
+        [openEdit, petMovers, petShipRouteText, requestDelete]
     );
 
     return (
@@ -164,8 +288,12 @@ export function MovementSchedulePage (): JSX.Element {
                 </Button>
             </Space>
             <p style={{ marginBottom: 16, color: petTheme.textMuted }}>
-                Define routes between points. Booking uses planned or active pet ships only.
+                Define routes between points. Booking uses planned or active pet ships only. Trips appear in the
+                calendar by departure date (add them with the button above).
             </p>
+            <div data-testid="schedule-calendar" style={{ marginBottom: 24 }}>
+                <Calendar fullscreen={false} cellRender={calendarCellRender} />
+            </div>
             <div data-testid="schedule-table">
                 <Table<PetShipRecord>
                     columns={columns}
@@ -188,6 +316,15 @@ export function MovementSchedulePage (): JSX.Element {
                 okText="Save"
                 destroyOnClose
             >
+                {petMoverOptions.length === 0 ? (
+                    <Alert
+                        type="warning"
+                        showIcon
+                        style={{ marginBottom: 16 }}
+                        message="No active PetMover"
+                        description="Add at least one active PetMover under PetMovers, then create a pet ship."
+                    />
+                ) : null}
                 <Form data-testid="schedule-form" form={form} layout="vertical" className="ant-form">
                     <Form.Item name="refCode" label="Ref" rules={[{ required: true, message: 'Required' }]}>
                         <Input data-testid="schedule-field-ref" />
@@ -220,14 +357,59 @@ export function MovementSchedulePage (): JSX.Element {
                             optionFilterProp="label"
                         />
                     </Form.Item>
-                    <Form.Item name="departure" label="Departure" rules={[{ required: true }]}>
-                        <Input data-testid="schedule-field-departure" placeholder="2026-04-08 09:00" />
+                    <Form.Item
+                        name="departure"
+                        label="Departure"
+                        rules={[{ required: true, message: 'Required' }]}
+                        getValueFromEvent={(d: Dayjs | null) => (d?.isValid() ? d.format(DATETIME_FMT) : '')}
+                        getValueProps={(value: string) => ({
+                            value:
+                                value && dayjs(value, DATETIME_FMT, true).isValid()
+                                    ? dayjs(value, DATETIME_FMT, true)
+                                    : undefined,
+                        })}
+                    >
+                        <DatePicker
+                            showTime
+                            format={DATETIME_FMT}
+                            style={{ width: '100%' }}
+                            data-testid="schedule-field-departure"
+                            inputReadOnly={false}
+                        />
                     </Form.Item>
-                    <Form.Item name="arrival" label="Arrival" rules={[{ required: true }]}>
-                        <Input data-testid="schedule-field-arrival" placeholder="2026-04-08 18:30" />
+                    <Form.Item
+                        name="arrival"
+                        label="Arrival"
+                        rules={[{ required: true, message: 'Required' }]}
+                        getValueFromEvent={(d: Dayjs | null) => (d?.isValid() ? d.format(DATETIME_FMT) : '')}
+                        getValueProps={(value: string) => ({
+                            value:
+                                value && dayjs(value, DATETIME_FMT, true).isValid()
+                                    ? dayjs(value, DATETIME_FMT, true)
+                                    : undefined,
+                        })}
+                    >
+                        <DatePicker
+                            showTime
+                            format={DATETIME_FMT}
+                            style={{ width: '100%' }}
+                            data-testid="schedule-field-arrival"
+                            inputReadOnly={false}
+                        />
                     </Form.Item>
-                    <Form.Item name="petMover" label="PetMover" rules={[{ required: true }]}>
-                        <Input data-testid="schedule-field-petmover" />
+                    <Form.Item
+                        name="petMover"
+                        label="PetMover"
+                        tooltip="Tariff currency (EUR/USD) comes from this PetMover in PetMovers."
+                        rules={[{ required: true, message: 'Required' }]}
+                    >
+                        <Select
+                            showSearch
+                            optionFilterProp="label"
+                            options={petMoverOptionsForModal}
+                            placeholder="Select PetMover"
+                            data-testid="schedule-field-petmover"
+                        />
                     </Form.Item>
                     <Form.Item name="status" label="Status" rules={[{ required: true }]}>
                         <Select options={STATUS_OPTIONS} data-testid="schedule-field-status" />

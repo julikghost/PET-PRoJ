@@ -1,6 +1,5 @@
 /**
- * Playwright configuration: timeouts, reporters, projects `logistics_session` (persist session)
- * and `logistics_web` (main tests with `storageState` and `baseURL`).
+ * Playwright configuration: `logistics_session` (persist session), `logistics_web` (CRUD + Reports).
  */
 import { defineConfig } from '@playwright/test';
 import { config, storageStatePath } from './config-logistics';
