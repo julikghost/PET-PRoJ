@@ -1,37 +1,115 @@
-<!-- Repository documentation: how to run Playwright, required environment variables, Allure. -->
-## E2E-Playwright
+# PET Logistics UI + E2E
 
-**Публикация на GitHub:** см. [docs/GITHUB.md](docs/GITHUB.md) (HTTPS, без SSH на первом шаге).
+## Project Purpose
 
-### PET app (local UI stub)
+This pet project is designed as a learning and portfolio project to practice QA Automation in a production-like workflow.  
+The goal is to cover the full E2E testing cycle (UI + API), build a maintainable Playwright architecture, and generate clear test reports with Allure.
 
-The `pet-app/` folder is a minimal Vite + React + Ant Design UI plus an in-dev `POST /api/graphql` handler so you can run the suite without a real backend. **GraphQL SDL (intended API contract):** `pet-app/graphql/schema.graphql`. See `pet-app/README.md`, copy `pet-app/.env.example` to `pet-app/.env`, align the repo root `.env` with `pet-app/README.md`, copy `pet-app/e2e-fixtures.sample.json` to `tests/logistics/fixtures.local.json`, then `npm run pet:dev` in one terminal and Playwright in another.
+## What the Project Includes
 
-TypeScript config: `playwright.config.ts`. Copy `tests/logistics/fixtures.example.json` to `fixtures.local.json` (gitignored) or set `LOGISTICS_REPORT_FIXTURES_JSON`. Optional `E2E_FIXTURE_SUBSTITUTIONS_JSON`: JSON object of literal string replacements applied to loaded fixture JSON (e.g. renaming legacy labels without editing files).
+The repository contains two connected parts:
 
-**Logistics web (E2E):** `LOGISTICS_BASE_CLIENT_URL`, `LOGISTICS_BASE_API_URL`, `LOGISTICS_UI_USER_NAME` (or `LOGISTICS_E2E_USER_NAME`), `LOGISTICS_PASSWORD`. **Hosted login:** `E2E_LOGIN_USER_FIELD_NAME` (required: HTML `name` of the user identifier input). Optional: `E2E_LOGIN_URL_GLOB` (Playwright URL glob while opening login), `E2E_CONSENT_ROOT_SELECTOR`, `E2E_CONSENT_ACCEPT_SELECTOR` (authorization prompt), `E2E_OFFLINE_SCOPE_CHECKBOX_LABEL` (or legacy `E2E_OIDC_OFFLINE_CHECKBOX`). Session storage (gitignored): default `storageState/session.json`, or `E2E_STORAGE_STATE_PATH`. After the session setup project, bearer token is in `process.env.E2E_SESSION_ACCESS_TOKEN` for the same worker.
+- `pet-app/` - a local demo app built with React + Vite + Ant Design for logistics scenarios.
+- Root E2E layer (`tests/`, `pageObjects/`) - Playwright automation tests written in TypeScript.
 
-UI labels and timezone: `utils/text.ts` (`E2E_UI_*`) and `E2E_TIME_ZONE` in `config-logistics.ts`. Optional: `E2E_REPORT_DOWNLOAD_URL_HINT` (regex fragment to pick download URLs from JSON responses; default avoids vendor-specific tokens).
+Main application modules:
+
+- Points
+- Pet Shipping
+- Booking (including Dog Daycare pricing logic)
+- Pet Movers
+- Reports (with GraphQL payload checks)
+
+Core automation practices:
+
+- Page Object Model (`pageObjects/`)
+- Reusable browser session via `storageState/session.json`
+- Stable `data-testid` locators
+- Dynamic test data setup and cleanup within scenarios
+- Allure reporting via `allure-playwright`
+
+## Repository Structure
+
+- `pet-app/` - UI app and local API stub (`POST /api/graphql`)
+- `tests/auth/` - setup project for login and session persistence
+- `tests/logistics/` - business E2E scenarios
+- `pageObjects/` - page object classes
+- `storageState/` - persisted session state (gitignored)
+- `playwright.config.ts` - runner configuration, projects, and reporters
+
+## Environment Setup
+
+Requirements:
+
+- Node.js + npm
+- Allure CLI (installed globally)
+
+Install dependencies from the repository root:
 
 ```bash
-RUN ALL TESTS EXAMPLE: npx playwright test --config=playwright.config.ts --reporter=line
-RUN ONE SPECIFIC TEST EXAMPLE: npx playwright test tests/logistics/reports.spec.ts --reporter=line
-RUN ONE PROJECT EXAMPLE: npx playwright test --project=logistics_web
+npm install
+npm install --prefix pet-app
 ```
 
-## ALLURE
+Configure environment variables:
+
+1. Copy `.env.example` to `.env` (repository root).
+2. Copy `pet-app/.env.example` to `pet-app/.env`.
+3. Make sure credentials match between `pet-app/.env` and root `.env`.
+4. For `reports.spec.ts`, provide fixtures:
+   - either `tests/logistics/fixtures.local.json` (from `tests/logistics/fixtures.example.json`),
+   - or `LOGISTICS_REPORT_FIXTURES_JSON` environment variable.
+
+## Run the Project (UI)
+
+From the repository root:
 
 ```bash
-To use allure report, don't use: --reporter=line
-
-RUN ALLURE: allure serve
-
-!!!Allure should be installed globally on your system!!!
+npm run pet:dev
 ```
 
-## DOCS
+By default, the app runs at `http://localhost:5173/`.  
+If the port is busy, set `PET_DEV_PORT` in `pet-app/.env` (for example, `5174`) and update `LOGISTICS_BASE_CLIENT_URL` / `LOGISTICS_BASE_API_URL` in root `.env`.
+
+## Run Automation Tests
+
+1. Start the UI (`npm run pet:dev`) in a separate terminal.
+2. Run Playwright commands from the repository root:
 
 ```bash
-PLAYWRIGHT: https://playwright.dev/docs/intro
-ALLURE: https://allurereport.org/docs/how-it-works/
+# Full run (setup + logistics)
+npm run e2e
+
+# Logistics tests only
+npm run e2e-logistics
+
+# Session setup only
+npx playwright test --project=logistics_session
+
+# Single spec
+npx playwright test tests/logistics/booking.spec.ts --project=logistics_web
 ```
+
+## Generate Allure Report
+
+Important: do not override the reporter with `--reporter=line` if you need Allure results, because `allure-playwright` will not be used.
+
+1. Run tests with the standard command (`npm run e2e`) to generate `allure-results`.
+2. Start an interactive local report:
+
+```bash
+allure serve allure-results
+```
+
+Optional static report generation:
+
+```bash
+allure generate allure-results --clean -o allure-report
+allure open allure-report
+```
+
+## Useful Links
+
+- Playwright: [https://playwright.dev/docs/intro](https://playwright.dev/docs/intro)
+- Allure: [https://allurereport.org/docs/how-it-works/](https://allurereport.org/docs/how-it-works/)
+- GitHub publishing notes: [docs/GITHUB.md](docs/GITHUB.md)
