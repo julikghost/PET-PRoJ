@@ -1,9 +1,7 @@
 import * as fs from 'fs';
 import { randomUUID } from 'node:crypto';
-import { test, expect } from '@playwright/test';
 import { config } from '../../config-logistics';
 import { MENU_ITEM, REPORTS_DATA_TESTID } from '../../utils/constants';
-import { LogisticsApp } from '../../pageObjects/LogisticsApp';
 import type { EmailSendCapture } from '../../pageObjects/Reports';
 import { reports } from '../../utils/text';
 import { getCurrentMonthRangeDays, getCurrentMonthRangeDaysUTC } from '../../utils/date';
@@ -12,6 +10,7 @@ import {
     type LogisticsReportGraphqlExpected,
     type LogisticsReportFixtures
 } from './reportFixtures';
+import { expect, test } from '../fixtures/logisticsApp.fixture';
 
 // --- Module-level inputs (env + external fixtures) ---
 const { uiUsername } = config;
@@ -49,7 +48,7 @@ test.describe('Reports', () => {
         'NDA: add tests/logistics/fixtures.local.json (see fixtures.example.json) or LOGISTICS_REPORT_FIXTURES_JSON'
     );
 
-    test('Send report by email with updated filters', async ({ page }) => {
+    test('Send report by email with updated filters', async ({ page, logisticsApp }) => {
         test.skip(
             !config.adminUsername
             || !config.adminPassword
@@ -69,9 +68,8 @@ test.describe('Reports', () => {
         } = fx;
 
         // --- Act + assert; finally: remove PetMover `petmover-<uuid>` ---
-        const app = new LogisticsApp(page);
-        await app.loginAsPetAdmin();
-        await app.clearPetMoversStorage();
+        await logisticsApp.loginAsPetAdmin();
+        await logisticsApp.clearPetMoversStorage();
 
         const pmUuid = randomUUID();
         const petMoverName = `petmover-${pmUuid}`;
@@ -79,15 +77,15 @@ test.describe('Reports', () => {
         let petMoverCodeForTeardown: string | undefined;
 
         try {
-            await app.navigationSidebar.clickMenuItem(MENU_ITEM.PET_MOVERS);
-            const petMoverUi = await app.petMovers.createActivePetMover({
+            await logisticsApp.navigationSidebar.clickMenuItem(MENU_ITEM.PET_MOVERS);
+            const petMoverUi = await logisticsApp.petMovers.createActivePetMover({
                 name: petMoverName,
                 code: petMoverCode,
             });
             petMoverCodeForTeardown = petMoverCode;
 
             // Reports form (incl. `data-testid="pet-reports-pet-mover"`) is used as PetAccountant; admin only for PetMovers precondition.
-            await app.loginAsPetAccountant();
+            await logisticsApp.loginAsPetAccountant();
 
             const base = config.baseUrl.trim().replace(/\/?$/, '');
             await page.goto(`${base}/reports`, { waitUntil: 'domcontentloaded' });
@@ -96,25 +94,25 @@ test.describe('Reports', () => {
                 timeout: 20000,
             });
 
-            await app.reports.field.selectOptions({
+            await logisticsApp.reports.field.selectOptions({
                 name: reports.petMover,
                 options: petMoverUi.label,
                 testId: REPORTS_DATA_TESTID.petMoverField,
             });
-            await app.reports.field.fillDateRange({ name: reports.dateRange, startDate, endDate });
-            await app.reports.field.selectOptions({ name: reports.paymentType, options: uiPaymentMethods });
-            await app.reports.field.selectOptions({ name: reports.currency, options: uiCurrencies });
+            await logisticsApp.reports.field.fillDateRange({ name: reports.dateRange, startDate, endDate });
+            await logisticsApp.reports.field.selectOptions({ name: reports.paymentType, options: uiPaymentMethods });
+            await logisticsApp.reports.field.selectOptions({ name: reports.currency, options: uiCurrencies });
 
             if (uiUsername) {
-                await app.reports.field.fillField({ name: reports.sendReportTo, value: uiUsername });
+                await logisticsApp.reports.field.fillField({ name: reports.sendReportTo, value: uiUsername });
             } else {
-                await app.reports.field.fillField({
+                await logisticsApp.reports.field.fillField({
                     name: reports.sendReportTo,
                     value: 'reports-e2e@example.com',
                 });
             }
 
-            const emailSend: EmailSendCapture = await app.reports.sendByEmail();
+            const emailSend: EmailSendCapture = await logisticsApp.reports.sendByEmail();
 
             // --- Assert: request basics ---
             expect(emailSend && emailSend.requestUrl).toBeTruthy();
@@ -215,8 +213,8 @@ test.describe('Reports', () => {
         } finally {
             if (petMoverCodeForTeardown) {
                 try {
-                    await app.loginAsPetAdmin();
-                    await app.deletePetMoverByCode(petMoverCodeForTeardown);
+                    await logisticsApp.loginAsPetAdmin();
+                    await logisticsApp.deletePetMoverByCode(petMoverCodeForTeardown);
                 } catch {
                     /* ignore */
                 }

@@ -1,16 +1,15 @@
-import { test, expect } from '@playwright/test';
-import { MENU_ITEM } from '../../utils/constants';
 import { config } from '../../config-logistics';
-import { LogisticsApp } from '../../pageObjects/LogisticsApp';
+import { MENU_ITEM } from '../../utils/constants';
+import { getCurrentAndTomorrowDateTimes, getTodayAndTomorrowDays } from '../../utils/date';
 import { booking as bookingText } from '../../utils/text';
 import { petShipping as petShippingText } from '../../utils/text';
 import { points as pointsText } from '../../utils/text';
-import { getCurrentAndTomorrowDateTimes, getTodayAndTomorrowDays } from '../../utils/date';
+import { expect, test } from '../fixtures/logisticsApp.fixture';
 
 const { adminUsername, adminPassword } = config;
 
 test.describe('Booking', () => {
-    test('create booking on an available pet ship', async ({ page }) => {
+    test('create booking on an available pet ship', async ({ page, logisticsApp }) => {
         test.skip(
             !adminUsername || !adminPassword,
             'Set LOGISTICS_ADMIN_USER_NAME and LOGISTICS_ADMIN_PASSWORD (PetMover precondition + full flow).'
@@ -27,18 +26,17 @@ test.describe('Booking', () => {
         let codeFrom: string | undefined;
         let codeTo: string | undefined;
 
-        const app = new LogisticsApp(page);
         try {
-            await app.openLogisticsApp();
-            await app.loginAsPetAdmin();
-            await app.clearPetLogisticsData();
-            await app.clearPetMoversStorage();
+            await logisticsApp.openLogisticsApp();
+            await logisticsApp.loginAsPetAdmin();
+            await logisticsApp.clearPetLogisticsData();
+            await logisticsApp.clearPetMoversStorage();
 
-            const pm = await app.createPetMoverForPetShippingPrecondition();
+            const pm = await logisticsApp.createPetMoverForPetShippingPrecondition();
             pmCode = pm.code;
 
-            await app.navigationSidebar.clickMenuItem(MENU_ITEM.POINTS);
-            const routes = await app.points.createTwoDistinctPointsForRoutes({
+            await logisticsApp.navigationSidebar.clickMenuItem(MENU_ITEM.POINTS);
+            const routes = await logisticsApp.points.createTwoDistinctPointsForRoutes({
                 suffix: String(ts),
                 from: { name: 'Hub A', city: 'Amsterdam', kindLabel: pointsText.kindHub },
                 to: { name: 'Hub B', city: 'Zurich', kindLabel: pointsText.kindHub },
@@ -47,8 +45,8 @@ test.describe('Booking', () => {
             codeTo = routes.codeTo;
             const { fromLabel, toLabel } = routes;
 
-            await app.navigationSidebar.clickMenuItem(MENU_ITEM.PET_SHIPPING);
-            await app.petShipping.createPetShip({
+            await logisticsApp.navigationSidebar.clickMenuItem(MENU_ITEM.PET_SHIPPING);
+            await logisticsApp.petShipping.createPetShip({
                 refCode: shipRef,
                 fromLabel,
                 toLabel,
@@ -58,8 +56,8 @@ test.describe('Booking', () => {
                 statusLabel: petShippingText.statusPlanned,
             });
 
-            await app.navigationSidebar.clickMenuItem(MENU_ITEM.BOOKING);
-            const bk = app.booking;
+            await logisticsApp.navigationSidebar.clickMenuItem(MENU_ITEM.BOOKING);
+            const bk = logisticsApp.booking;
             await bk.expectLoaded();
 
             await bk.clickAdd();
@@ -97,7 +95,7 @@ test.describe('Booking', () => {
             await expect(page.getByText(bookingText.toastDeleted)).toBeVisible();
             await bk.expectNoRowContains(bkRef);
         } finally {
-            await app.teardownPetE2eData({
+            await logisticsApp.teardownPetE2eData({
                 bookingRef: bkRef,
                 petShipRef: shipRef,
                 pointCodes: [codeFrom, codeTo].filter(Boolean) as string[],

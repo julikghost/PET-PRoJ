@@ -2,17 +2,14 @@
  * One smoke test per PET stub role: fails fast when LOGISTICS_* and VITE_PET_* (Docker build) disagree.
  *
  * CI: runs before every matrix job (`logistics_web` deps); Docker sets `E2E_PET_STUB_LOGIN`, `E2E_DOCKER`.
- * Serial mode avoids parallel logins against the same PET UI during multi-worker Playwright runs.
+ * Each test uses a fresh context; `openPetStubLoginPage` clears PET session — no describe-level serial coupling.
  */
-import { test, expect } from '@playwright/test';
 import { config } from '../../config-logistics';
-import { LogisticsApp } from '../../pageObjects/LogisticsApp';
 import { MENU_ITEM } from '../../utils/constants';
 import { usePetStubLoginFlow } from '../../utils/petStubLoginFlow';
+import { expect, test } from '../fixtures/logisticsApp.fixture';
 
 test.describe('PET stub: role login smoke', () => {
-    test.describe.configure({ mode: 'serial' });
-
     test.beforeEach(() => {
         test.skip(
             !usePetStubLoginFlow(),
@@ -21,15 +18,14 @@ test.describe('PET stub: role login smoke', () => {
         test.skip(!config.baseUrl?.trim(), 'LOGISTICS_BASE_CLIENT_URL is empty');
     });
 
-    test('PetUser signs in and reaches Home', async ({ page }) => {
+    test('PetUser signs in and reaches Home', async ({ page, logisticsApp }) => {
         test.skip(!config.uiUsername || !config.password, 'Set LOGISTICS_UI_USER_NAME and LOGISTICS_PASSWORD');
 
         const header = page.getByRole('banner');
         const sider = page.locator('.ant-layout-sider');
 
         await test.step('Sign in as PetUser', async () => {
-            const app = new LogisticsApp(page);
-            await app.loginAsPetUser();
+            await logisticsApp.loginAsPetUser();
         });
 
         await test.step('Assert PetUser shell (Home, no admin/accountant badge)', async () => {
@@ -40,15 +36,14 @@ test.describe('PET stub: role login smoke', () => {
         });
     });
 
-    test('PetAdmin signs in and sees PetMovers', async ({ page }) => {
+    test('PetAdmin signs in and sees PetMovers', async ({ page, logisticsApp }) => {
         test.skip(!config.adminUsername || !config.adminPassword, 'Set LOGISTICS_ADMIN_USER_NAME and LOGISTICS_ADMIN_PASSWORD');
 
         const header = page.getByRole('banner');
         const sider = page.locator('.ant-layout-sider');
 
         await test.step('Sign in as PetAdmin', async () => {
-            const app = new LogisticsApp(page);
-            await app.loginAsPetAdmin();
+            await logisticsApp.loginAsPetAdmin();
         });
 
         await test.step('Assert PetAdmin shell', async () => {
@@ -58,7 +53,7 @@ test.describe('PET stub: role login smoke', () => {
         });
     });
 
-    test('PetAccountant signs in and lands on Reports', async ({ page }) => {
+    test('PetAccountant signs in and lands on Reports', async ({ page, logisticsApp }) => {
         test.skip(
             !config.accountantUsername || !config.accountantPassword,
             'Set LOGISTICS_ACCOUNTANT_USER_NAME and LOGISTICS_ACCOUNTANT_PASSWORD'
@@ -68,8 +63,7 @@ test.describe('PET stub: role login smoke', () => {
         const sider = page.locator('.ant-layout-sider');
 
         await test.step('Sign in as PetAccountant', async () => {
-            const app = new LogisticsApp(page);
-            await app.loginAsPetAccountant();
+            await logisticsApp.loginAsPetAccountant();
         });
 
         await test.step('Assert PetAccountant shell (Reports only)', async () => {

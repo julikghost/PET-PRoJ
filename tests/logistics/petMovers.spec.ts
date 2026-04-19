@@ -1,8 +1,7 @@
-import { test, expect } from '@playwright/test';
-import { MENU_ITEM } from '../../utils/constants';
 import { config } from '../../config-logistics';
-import { LogisticsApp } from '../../pageObjects/LogisticsApp';
+import { MENU_ITEM } from '../../utils/constants';
 import { petMovers as petMoversText } from '../../utils/text';
+import { expect, test } from '../fixtures/logisticsApp.fixture';
 
 const { adminUsername, adminPassword } = config;
 
@@ -12,13 +11,12 @@ test.describe('PetMovers', () => {
         'Set LOGISTICS_ADMIN_USER_NAME and LOGISTICS_ADMIN_PASSWORD (see .env.example)'
     );
 
-    test('create, update, and delete a PetMover', async ({ page }) => {
-        const app = new LogisticsApp(page);
-        await app.openLogisticsApp();
-        await app.loginAsPetAdmin();
+    test('create, update, and delete a PetMover', async ({ page, logisticsApp }) => {
+        await logisticsApp.openLogisticsApp();
+        await logisticsApp.loginAsPetAdmin();
 
-        await app.navigationSidebar.clickMenuItem(MENU_ITEM.PET_MOVERS);
-        const pm = app.petMovers;
+        await logisticsApp.navigationSidebar.clickMenuItem(MENU_ITEM.PET_MOVERS);
+        const pm = logisticsApp.petMovers;
 
         await pm.expectLoaded();
 
