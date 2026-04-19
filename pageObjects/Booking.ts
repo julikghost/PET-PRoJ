@@ -114,7 +114,8 @@ export class Booking {
                 petShipField.locator('.ant-select-selection-item').filter({ hasText: values.petShipLabel }).first()
             ).toBeVisible({ timeout: 15000 });
 
-            const dateInput = modal.getByTestId('booking-field-date').getByRole('textbox');
+            const dateField = modal.getByTestId('booking-field-date');
+            const dateInput = dateField.locator('.ant-picker-input input').first();
             await dateInput.click({ force: true });
             const dateDropdown = this.page.locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)').last();
             let pickedFromCalendar = false;
@@ -129,6 +130,12 @@ export class Booking {
                 /* fallback to plain input */
             }
             if (!pickedFromCalendar) {
+                // Picker may be open with no matching cell (e.g. wrong month); it blocks the input for clear/fill.
+                await this.page.keyboard.press('Escape');
+                await this.page
+                    .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
+                    .waitFor({ state: 'hidden', timeout: 5000 })
+                    .catch(() => {});
                 await dateInput.clear();
                 await dateInput.fill(values.dateYmd);
                 await dateInput.press('Enter');

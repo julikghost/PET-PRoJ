@@ -11,7 +11,8 @@
     "e2e-logistics": "npx playwright test tests --config=./playwright.config.ts",
     "pet:dev": "npm run dev --prefix pet-app",
     "docker:pet:build": "docker build -t logistics-pet-ui ./pet-app",
-    "docker:pet:up": "docker compose up --build pet-app"
+    "docker:pet:up": "docker compose up --build pet-app",
+    "qase:push-requirements": "node scripts/push-qase-requirements.mjs"
   },
   "keywords": [],
   "author": "",
