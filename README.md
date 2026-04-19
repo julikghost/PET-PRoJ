@@ -136,11 +136,50 @@ npx playwright test tests/logistics/booking.spec.ts --project=logistics_web
 
 ### Run E2E in Docker
 
-The stack builds **pet-app** from `pet-app/Dockerfile`, waits until it is healthy, then runs the full Playwright suite in the **Playwright** image (`docker-compose.e2e.yml`). URLs point at `http://pet-app:5173/` inside the Compose network; `E2E_PET_STUB_LOGIN=1` is set there so the PET login form flow is used (not OIDC). With `E2E_DOCKER=1`, Playwright adds the **`list`** reporter so each spec shows a pass/fail line in the container logs (JUnit and Allure are unchanged).
+The stack builds **pet-app** from `pet-app/Dockerfile`, waits until it is healthy, then runs the full Playwright suite in the **Playwright** image (`docker-compose.e2e.yml`). URLs point at `http://pet-app:5173/` inside the Compose network; `E2E_PET_STUB_LOGIN=1` is set there so the PET login form flow is used (not OIDC). **`E2E_PLAYWRIGHT_WORKERS`** defaults to **4** (passed as `npx playwright test --workers=…`, overriding `workers: 1` in `playwright.config.ts`). Override from the host, e.g. `E2E_PLAYWRIGHT_WORKERS=1 docker compose …`. With `E2E_DOCKER=1`, Playwright adds the **`list`** reporter so each spec shows a pass/fail line in the container logs (JUnit and Allure are unchanged).
 
 **Requirements:** Docker Engine and Docker Compose v2.
 
-From the repository root:
+#### Manual Docker run (local)
+
+All commands are from the **repository root** (where `docker-compose.e2e.yml` lives).
+
+1. **Credentials** — Copy `.env.example` → `.env` if needed. Build-time `VITE_PET_*` must match these `LOGISTICS_*` values; after changing passwords run `docker compose -f docker-compose.e2e.yml build --no-cache pet-app` (or `up --build`).
+2. **Full suite** — builds `pet-app`, starts it, runs `scripts/docker-e2e-run.sh` (role smoke → session → logistics specs). Playwright **`storageState`** for `logistics_web` is `storageState/session.json` inside the repo (see `E2E_STORAGE_STATE_PATH` in `docker-compose.e2e.yml`, cwd `/work` in the container). Reports land on the host under `./test-results`, `results.xml`, `allure-results` (bind mount `.:/work`).
+
+```bash
+docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
+```
+
+3. **Single spec** (same as CI) — still runs dependency projects (`logistics_role_smoke`, `logistics_session`) then the file:
+
+```bash
+docker compose -f docker-compose.e2e.yml build pet-app
+E2E_PLAYWRIGHT_SPEC=tests/logistics/booking.spec.ts docker compose -f docker-compose.e2e.yml up --no-build --abort-on-container-exit --exit-code-from e2e
+```
+
+PowerShell (Windows):
+
+```powershell
+docker compose -f docker-compose.e2e.yml build pet-app
+$env:E2E_PLAYWRIGHT_SPEC = "tests/logistics/booking.spec.ts"
+docker compose -f docker-compose.e2e.yml up --no-build --abort-on-container-exit --exit-code-from e2e
+Remove-Item Env:E2E_PLAYWRIGHT_SPEC -ErrorAction SilentlyContinue
+```
+
+4. **Cleanup** — `docker compose -f docker-compose.e2e.yml down -v`
+
+5. **Optional: shell inside the runner image** (pet-app must already be up / healthy — e.g. another terminal ran `docker compose -f docker-compose.e2e.yml up -d pet-app` and you waited for health):
+
+```bash
+docker compose -f docker-compose.e2e.yml run --rm e2e bash -lc 'cd /work && npm ci && npx playwright test tests/logistics/booking.spec.ts --project=logistics_web --workers=4 --config=playwright.config.ts'
+```
+
+Adjust paths and `--workers` as needed; env vars such as `LOGISTICS_*` are inherited from `docker-compose.e2e.yml` when using `docker compose run e2e`.
+
+---
+
+From the repository root (short reference):
 
 ```bash
 docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
@@ -159,14 +198,7 @@ When finished, remove containers (and anonymous volumes if any):
 docker compose -f docker-compose.e2e.yml down -v
 ```
 
-**GitHub Actions:** the same stack runs in [`.github/workflows/e2e-docker.yml`](.github/workflows/e2e-docker.yml) on pushes and pull requests to `main` — the workflow uses a **matrix**: each logistics spec is a **separate job** (named `E2E Docker / points`, `/ booking`, …) so the Actions UI shows per-file results. Each job builds the `pet-app` image, then runs Compose with `--no-build` and sets `E2E_PLAYWRIGHT_SPEC` to that file. Playwright runs **`logistics_role_smoke`** first (per-role PET stub login), then **`logistics_session`** (persist user `storageState`), then the chosen spec (`dependencies` in `playwright.config.ts`). On failure, artifacts are uploaded as `e2e-docker-artifacts-<name>`.
-
-To run **one** spec locally in Docker (same variable as CI):
-
-```bash
-docker compose -f docker-compose.e2e.yml build pet-app
-E2E_PLAYWRIGHT_SPEC=tests/logistics/booking.spec.ts docker compose -f docker-compose.e2e.yml up --no-build --abort-on-container-exit --exit-code-from e2e
-```
+**GitHub Actions:** [`.github/workflows/e2e-docker.yml`](.github/workflows/e2e-docker.yml) runs **only Docker E2E** on pushes / PRs to `main`. A prep job discovers every `tests/logistics/*.spec.ts`; each file is its own matrix row (`E2E Docker / <basename>`). Add a new spec under `tests/logistics/` and it appears as a **new job** automatically. Each job builds `pet-app`, runs Compose with `--no-build`, sets `E2E_PLAYWRIGHT_SPEC` to that path; Playwright still runs **`logistics_role_smoke`** → **`logistics_session`** → spec (`dependencies` in `playwright.config.ts`). On failure, `test-results` / traces / `results.xml` upload as **`e2e-docker-<basename>`**, and the job summary includes a **clickable zip link** (`artifact-url`) when available.
 
 ## Generate Allure Report
 

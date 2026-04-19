@@ -1,3 +1,5 @@
+# Docker-only Playwright E2E: each `tests/logistics/*.spec.ts` is its own matrix job — new specs are picked up automatically.
+
 name: E2E (Docker)
 
 on:
@@ -6,28 +8,64 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
-  # One GitHub Actions job per Playwright spec file: clear pass/fail in the UI; each job builds pet-app (parallel cap below limits load).
+  e2e-matrix-prep:
+    runs-on: ubuntu-latest
+    outputs:
+      include: ${{ steps.set.outputs.include }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: set
+        name: Discover specs (tests/logistics/*.spec.ts)
+        run: |
+          set -euo pipefail
+          if [ ! -d tests/logistics ]; then
+            echo '::error::tests/logistics not found'
+            exit 1
+          fi
+          node <<'NODE' > /tmp/e2e-matrix-include.json
+          const fs = require('fs');
+          const path = require('path');
+          const dir = path.join(process.cwd(), 'tests', 'logistics');
+          const include = fs
+            .readdirSync(dir)
+            .filter((f) => f.endsWith('.spec.ts'))
+            .sort()
+            .map((f) => ({
+              name: f.replace(/\.spec\.ts$/, ''),
+              spec: path.posix.join('tests', 'logistics', f),
+            }));
+          if (include.length === 0) {
+            console.error('No tests/logistics/*.spec.ts files');
+            process.exit(1);
+          }
+          process.stdout.write(JSON.stringify(include));
+          NODE
+          {
+            echo 'include<<JSON_EOF'
+            cat /tmp/e2e-matrix-include.json
+            echo JSON_EOF
+          } >> "$GITHUB_OUTPUT"
+
   e2e-docker:
+    needs: e2e-matrix-prep
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: 4
       matrix:
-        include:
-          - { name: points, spec: tests/logistics/00-points.spec.ts }
-          - { name: booking, spec: tests/logistics/booking.spec.ts }
-          - { name: pet-shipping, spec: tests/logistics/petShipping.spec.ts }
-          - { name: pet-movers, spec: tests/logistics/petMovers.spec.ts }
-          - { name: reports, spec: tests/logistics/reports.spec.ts }
+        include: ${{ fromJson(needs.e2e-matrix-prep.outputs.include) }}
 
     name: E2E Docker / ${{ matrix.name }}
 
     steps:
       - uses: actions/checkout@v4
 
-      # Build the PET UI image first; only after a successful image do we start the stack and tests.
       - name: Build PET UI (pet-app) image
         run: docker compose -f docker-compose.e2e.yml build pet-app
 
@@ -46,10 +84,29 @@ jobs:
 
       - name: Upload Playwright report and JUnit
         if: failure()
+        id: upload-e2e
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-docker-artifacts-${{ matrix.name }}
+          name: e2e-docker-${{ matrix.name }}
           path: |
             results.xml
             test-results
             allure-results
+          if-no-files-found: warn
+
+      - name: Job summary — artifact download link
+        if: failure() && steps.upload-e2e.outcome == 'success'
+        env:
+          ARTIFACT_URL: ${{ steps.upload-e2e.outputs.artifact-url }}
+        run: |
+          {
+            echo "### E2E artifacts (${{ matrix.name }})"
+            echo ""
+            if [ -n "${ARTIFACT_URL:-}" ]; then
+              echo "Download trace / screenshots / **results.xml**: [e2e-docker-${{ matrix.name }}.zip](${ARTIFACT_URL})"
+            else
+              echo "Artifacts uploaded under **e2e-docker-${{ matrix.name }}** — open the job’s **Artifacts** dropdown (ZIP contains \`test-results/\`, traces, screenshots)."
+            fi
+            echo ""
+            echo "Local trace viewer: \`npx playwright show-trace test-results/**/trace.zip\`"
+          } >> "$GITHUB_STEP_SUMMARY"

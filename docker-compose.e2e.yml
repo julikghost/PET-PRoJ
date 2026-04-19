@@ -60,6 +60,11 @@ services:
       E2E_PET_STUB_LOGIN: "1"
       E2E_DOCKER: "1"
       CI: "true"
+      # Same file `playwright.config.ts` uses via `storageStatePath` (cwd `/work` → `/work/storageState/session.json`).
+      # Written by project `logistics_session` before `logistics_web`; bind mount keeps it on the host under `./storageState/`.
+      E2E_STORAGE_STATE_PATH: ${E2E_STORAGE_STATE_PATH:-storageState/session.json}
+      # Parallelism inside the e2e container (CLI `--workers`; overrides playwright.config.ts).
+      E2E_PLAYWRIGHT_WORKERS: ${E2E_PLAYWRIGHT_WORKERS:-4}
       # Host may set this (e.g. CI matrix); empty = full suite. Passed into the container for the shell below.
       E2E_PLAYWRIGHT_SPEC: ${E2E_PLAYWRIGHT_SPEC:-}
     # Script avoids Compose `$…` interpolation eating the runtime `E2E_PLAYWRIGHT_SPEC` from the container env.

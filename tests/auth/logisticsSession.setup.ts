@@ -3,6 +3,7 @@ import * as path from 'path';
 import { test as setup, expect } from '@playwright/test';
 import { config, storageStatePath } from '../../config-logistics';
 import { getAccessToken } from '../../utils/helper';
+import { openPetStubLoginPage } from '../../utils/petStubLoginPage';
 import { LogisticsApp } from '../../pageObjects/LogisticsApp';
 
 /** PET: `/home` (ops) or `/reports` (accountant); OIDC clients often stay on `/`. */
@@ -45,28 +46,7 @@ setup('Persist logistics web session storage', async ({ page }) => {
                 'LOGISTICS_BASE_CLIENT_URL is empty — set it (e.g. http://pet-app:5173/ in Docker Compose).'
             );
         }
-        const rootUrl = `${baseUrl.trim().replace(/\/?$/, '/')}`;
-        const loginUrl = new URL('login', rootUrl).href;
-        const loginForm = page.getByTestId('pet-login-form');
-
-        await page.context().clearCookies();
-        await page.addInitScript(() => {
-            try {
-                localStorage.removeItem('pet-auth');
-            } catch {
-                /* ignore */
-            }
-        });
-
-        // Single login surface: `/login` (or `/` → redirect to `/login`).
-        await page.goto(loginUrl, { waitUntil: 'load', timeout: 60000 });
-        try {
-            await expect(loginForm).toBeVisible({ timeout: 25000 });
-        } catch {
-            await page.goto(rootUrl, { waitUntil: 'load', timeout: 60000 });
-            await page.waitForURL(/\/login/, { timeout: 30000 });
-            await expect(loginForm).toBeVisible({ timeout: 30000 });
-        }
+        await openPetStubLoginPage(page, baseUrl);
 
         await app.login.signInPetApp(uiUsername, password);
     } else {

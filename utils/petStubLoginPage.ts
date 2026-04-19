@@ -1,0 +1,35 @@
+/**
+ * PET stub: open `/login` reliably under `vite preview` / Docker (SPA fallback).
+ * Matches `tests/auth/logisticsSession.setup.ts` — relative `/login` alone can miss the bundle in CI.
+ */
+import type { Page } from '@playwright/test';
+import { expect } from '@playwright/test';
+
+export async function openPetStubLoginPage (page: Page, baseUrl: string): Promise<void> {
+    const trimmed = baseUrl?.trim();
+    if (!trimmed) {
+        throw new Error('LOGISTICS_BASE_CLIENT_URL is empty — cannot open PET login.');
+    }
+
+    const rootUrl = `${trimmed.replace(/\/?$/, '/')}`;
+    const loginUrl = new URL('login', rootUrl).href;
+    const loginForm = page.getByTestId('pet-login-form');
+
+    await page.context().clearCookies();
+    await page.addInitScript(() => {
+        try {
+            localStorage.removeItem('pet-auth');
+        } catch {
+            /* ignore */
+        }
+    });
+
+    await page.goto(loginUrl, { waitUntil: 'load', timeout: 60000 });
+    try {
+        await expect(loginForm).toBeVisible({ timeout: 25000 });
+    } catch {
+        await page.goto(rootUrl, { waitUntil: 'load', timeout: 60000 });
+        await page.waitForURL(/\/login/, { timeout: 30000 });
+        await expect(loginForm).toBeVisible({ timeout: 30000 });
+    }
+}

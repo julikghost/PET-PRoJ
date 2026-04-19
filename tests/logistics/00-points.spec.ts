@@ -11,8 +11,8 @@ test.describe('Points', () => {
         test.skip(!uiUsername || !password, 'Set LOGISTICS_UI_USER_NAME and LOGISTICS_PASSWORD');
 
         const app = new LogisticsApp(page);
-        await app.openLogisticsApp();
-        await app.loginAsPetUser();
+        // Session: PetUser from project `logistics_session` (`storageState/session.json`) — no extra login.
+        await page.goto('/home');
         await app.clearPetLogisticsData();
 
         await app.navigationSidebar.clickMenuItem(MENU_ITEM.POINTS);
