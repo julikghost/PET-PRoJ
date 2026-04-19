@@ -5,6 +5,7 @@
 # 4) матрица: один job на файл спека; `--no-deps`, headless Chromium
 #
 # Compose: по умолчанию `.github/scripts/ci/compose-e2e.sh` → docker-compose.e2e.yml (PET UI + Playwright, без Postgres).
+# Перед `compose up`/`run` пишется корневой `.env` из secrets (`write-docker-e2e-env.sh`) — как у локального первого запуска.
 # Полный стек (БД + заглушка api + UI + e2e): docker-compose.stack.yml — в job задайте env E2E_COMPOSE_STACK=1
 # (тот же compose-e2e.sh). После появления реального бэка правьте сервис `api` и LOGISTICS_BASE_API_URL у `e2e` в stack-файле.
 
@@ -160,6 +161,9 @@ jobs:
       - name: Pull PET UI image
         run: docker pull "${PET_APP_IMAGE}"
 
+      - name: Write .env for Docker Compose (auth + defaults)
+        run: bash .github/scripts/ci/write-docker-e2e-env.sh
+
       - name: Role smoke + logistics session (Playwright)
         run: bash .github/scripts/ci/compose-e2e.sh run --rm e2e bash /work/scripts/docker-e2e-session-prep.sh
 
@@ -237,6 +241,9 @@ jobs:
 
       - name: Pull PET UI image
         run: docker pull "${PET_APP_IMAGE}"
+
+      - name: Write .env for Docker Compose (auth + defaults)
+        run: bash .github/scripts/ci/write-docker-e2e-env.sh
 
       - name: Playwright E2E (Chromium, headless)
         run: >
