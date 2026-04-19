@@ -25,6 +25,9 @@ function usePetStubLoginFlow (): boolean {
     if (process.env.E2E_HOSTED_LOGISTICS_LOGIN === '1') {
         return false;
     }
+    if (process.env.E2E_PET_STUB_LOGIN === '1') {
+        return true;
+    }
     const idField = process.env.E2E_LOGIN_USER_FIELD_NAME?.trim();
     if (idField !== 'identifier') {
         return false;

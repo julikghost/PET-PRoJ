@@ -1,0 +1,46 @@
+# PET UI + Playwright E2E in Docker (CI / local parity). From repo root:
+#   docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
+services:
+  pet-app:
+    build:
+      context: ./pet-app
+      dockerfile: Dockerfile
+    expose:
+      - "5173"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:5173/',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 25s
+
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.57.0-noble
+    user: root
+    depends_on:
+      pet-app:
+        condition: service_healthy
+    working_dir: /work
+    volumes:
+      - .:/work
+    environment:
+      LOGISTICS_BASE_CLIENT_URL: http://pet-app:5173/
+      LOGISTICS_BASE_API_URL: http://pet-app:5173/api
+      LOGISTICS_UI_USER_NAME: pet@example.com
+      LOGISTICS_PASSWORD: pet-secret
+      LOGISTICS_ADMIN_USER_NAME: pet-admin@example.com
+      LOGISTICS_ADMIN_PASSWORD: pet-admin-secret
+      LOGISTICS_ACCOUNTANT_USER_NAME: pet-accountant@example.com
+      LOGISTICS_ACCOUNTANT_PASSWORD: pet-accountant-secret
+      E2E_LOGIN_USER_FIELD_NAME: identifier
+      E2E_TIME_ZONE: UTC
+      E2E_PET_STUB_LOGIN: "1"
+      CI: "true"
+    command: >
+      bash -lc "npm ci && npx playwright test --config=playwright.config.ts"

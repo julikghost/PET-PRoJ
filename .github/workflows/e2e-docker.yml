@@ -1,0 +1,36 @@
+name: E2E (Docker)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e-docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Playwright E2E (PET UI + tests in Docker)
+        run: >
+          docker compose -f docker-compose.e2e.yml up
+          --build
+          --abort-on-container-exit
+          --exit-code-from e2e
+
+      - name: Tear down Compose stack
+        if: always()
+        run: docker compose -f docker-compose.e2e.yml down -v
+
+      - name: Upload Playwright report and JUnit
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-docker-artifacts
+          path: |
+            results.xml
+            test-results
+            allure-results

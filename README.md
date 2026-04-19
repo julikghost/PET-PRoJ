@@ -48,6 +48,7 @@ Core automation practices:
 - `pageObjects/` - page object classes
 - `storageState/` - persisted session state (gitignored)
 - `playwright.config.ts` - runner configuration, projects, and reporters
+- `docker-compose.e2e.yml` - PET UI + Playwright in Docker (CI / local)
 
 ## Architecture Overview
 
@@ -130,6 +131,26 @@ npx playwright test --project=logistics_session
 npx playwright test tests/logistics/booking.spec.ts --project=logistics_web
 ```
 
+### Run E2E in Docker
+
+The stack builds **pet-app** from `pet-app/Dockerfile`, waits until it is healthy, then runs the full Playwright suite in the **Playwright** image (`docker-compose.e2e.yml`). URLs point at `http://pet-app:5173/` inside the Compose network; `E2E_PET_STUB_LOGIN=1` is set there so the PET login form flow is used (not OIDC).
+
+**Requirements:** Docker Engine and Docker Compose v2.
+
+From the repository root:
+
+```bash
+docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
+```
+
+When finished, remove containers (and anonymous volumes if any):
+
+```bash
+docker compose -f docker-compose.e2e.yml down -v
+```
+
+**GitHub Actions:** the same stack runs in [`.github/workflows/e2e-docker.yml`](.github/workflows/e2e-docker.yml) on pushes and pull requests to `main`. On failure, the workflow uploads `results.xml`, `test-results`, and `allure-results` as the `e2e-docker-artifacts` artifact.
+
 ## Generate Allure Report
 
 1. Run tests with the standard command (`npm run e2e`) to generate `allure-results`.
@@ -155,6 +176,7 @@ allure open allure-report
 | Tests timeout | Increase `timeout` in `playwright.config.ts` or use `--timeout=60000` flag |
 | Allure not showing results | Ensure you ran `npm run e2e` (not with `--reporter=line` override) |
 | Reports test skipped | Add `fixtures.local.json` or set `LOGISTICS_REPORT_FIXTURES_JSON` |
+| Docker E2E fails to pull Playwright image | Check tag in `docker-compose.e2e.yml` matches `@playwright/test` in `package-lock.json` |
 
 ## Important Notes
 
