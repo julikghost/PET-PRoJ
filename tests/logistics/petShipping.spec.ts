@@ -4,7 +4,7 @@ import { config } from '../../config-logistics';
 import { LogisticsApp } from '../../pageObjects/LogisticsApp';
 import { petShipping as petShippingText } from '../../utils/text';
 import { points as pointsText } from '../../utils/text';
-import { getCurrentAndTomorrowDateTimes } from '../../utils/date';
+import { getSameDayPetShipDateTimes } from '../../utils/date';
 
 const { adminUsername, adminPassword } = config;
 
@@ -17,9 +17,7 @@ test.describe('PetShipping', () => {
 
         const ts = Date.now();
         const shipRef = `E2E-PS-${ts}`;
-        const { currentDateTime, tomorrowDateTime } = getCurrentAndTomorrowDateTimes();
-        const departure = currentDateTime;
-        const arrival = tomorrowDateTime;
+        const { departure, arrival } = getSameDayPetShipDateTimes();
         let pmCode: string | undefined;
         let pm2Code: string | undefined;
         let codeFrom: string | undefined;

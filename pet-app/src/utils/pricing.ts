@@ -77,6 +77,32 @@ export function tripDayCount (departure: string, arrival: string): number {
     return Math.max(1, Math.ceil(hours / 24));
 }
 
+const PET_SHIP_MIN_DURATION_MINUTES = 30;
+
+/**
+ * Pet ship routes must end on the same calendar day as departure, with duration strictly over 30 minutes.
+ * Returns an English toast message or null if valid.
+ */
+export function petShipScheduleValidationMessage (departure: string, arrival: string): string | null {
+    const dep = dayjs(departure.trim(), DATETIME_FMT, true);
+    const arr = dayjs(arrival.trim(), DATETIME_FMT, true);
+    if (!dep.isValid() || !arr.isValid()) {
+        return 'Departure and arrival must be valid dates (YYYY-MM-DD HH:mm)';
+    }
+    if (!arr.isAfter(dep)) {
+        return 'Arrival must be after departure';
+    }
+    if (!dep.isSame(arr, 'day')) {
+        return 'Departure and arrival must be on the same calendar day';
+    }
+    const minutes = arr.diff(dep, 'minute');
+    if (minutes <= PET_SHIP_MIN_DURATION_MINUTES) {
+        return `Trip must be longer than ${PET_SHIP_MIN_DURATION_MINUTES} minutes on the same day`;
+    }
+
+    return null;
+}
+
 export function computeBookingPrice (
     weightKg: number,
     currency: PetShipCurrency,

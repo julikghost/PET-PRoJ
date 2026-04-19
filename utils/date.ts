@@ -31,6 +31,33 @@ export function getTodayAndTomorrowDays (timeZone: string = config.timeZone || d
     }
 }
 
+/**
+ * PetShipping rule: same calendar day and trip longer than 30 minutes — use for E2E ship creation.
+ */
+export function getSameDayPetShipDateTimes (timeZone: string = config.timeZone || defaultTimeZone): {
+    departure: string;
+    arrival: string;
+} {
+    try {
+        const zoned = toZonedTime(new Date(), timeZone);
+        const dateStr = format(zoned, 'yyyy-MM-dd');
+
+        return {
+            departure: `${dateStr} 10:00`,
+            arrival: `${dateStr} 12:00`,
+        };
+    } catch {
+        const d = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+        return {
+            departure: `${dateStr} 10:00`,
+            arrival: `${dateStr} 12:00`,
+        };
+    }
+}
+
 export function getCurrentAndTomorrowDateTimes (timeZone: string = config.timeZone || defaultTimeZone): {
     currentDateTime: string;
     tomorrowDateTime: string;

@@ -5,7 +5,7 @@ import { LogisticsApp } from '../../pageObjects/LogisticsApp';
 import { booking as bookingText } from '../../utils/text';
 import { petShipping as petShippingText } from '../../utils/text';
 import { points as pointsText } from '../../utils/text';
-import { getCurrentAndTomorrowDateTimes, getTodayAndTomorrowDays } from '../../utils/date';
+import { getSameDayPetShipDateTimes, getTodayAndTomorrowDays } from '../../utils/date';
 
 const { adminUsername, adminPassword } = config;
 
@@ -19,10 +19,8 @@ test.describe('Booking', () => {
         const ts = Date.now();
         const shipRef = `E2E-BK-SHIP-${ts}`;
         const bkRef = `E2E-BK-${ts}`;
-        const { currentDateTime, tomorrowDateTime } = getCurrentAndTomorrowDateTimes();
+        const { departure, arrival } = getSameDayPetShipDateTimes();
         const { todayDay, tomorrowDay } = getTodayAndTomorrowDays();
-        const departure = currentDateTime;
-        const arrival = tomorrowDateTime;
         let pmCode: string | undefined;
         let codeFrom: string | undefined;
         let codeTo: string | undefined;

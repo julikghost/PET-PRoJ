@@ -23,6 +23,7 @@ import {
     computeBookingPrice,
     computeDogDaycarePrice,
     normalizeDogDaycareHours,
+    petShipScheduleValidationMessage,
 } from '../utils/pricing';
 
 export const PET_LOGISTICS_STORAGE_KEY = 'pet-logistics-v1';
@@ -439,6 +440,12 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
                 }
                 if (full.fromPointId === full.toPointId) {
                     toast.error('From and To must differ');
+
+                    return prev;
+                }
+                const scheduleErr = petShipScheduleValidationMessage(full.departure, full.arrival);
+                if (scheduleErr) {
+                    toast.error(scheduleErr);
 
                     return prev;
                 }
