@@ -4,6 +4,7 @@ import { test as setup, expect } from '@playwright/test';
 import { config, storageStatePath } from '../../config-logistics';
 import { getAccessToken } from '../../utils/helper';
 import { openPetStubLoginPage } from '../../utils/petStubLoginPage';
+import { usePetStubLoginFlow } from '../../utils/petStubLoginFlow';
 import { LogisticsApp } from '../../pageObjects/LogisticsApp';
 
 /** PET: `/home` (ops) or `/reports` (accountant); OIDC clients often stay on `/`. */
@@ -20,22 +21,6 @@ const offlineScopeCheckbox =
     process.env.E2E_OFFLINE_SCOPE_CHECKBOX_LABEL?.trim()
     || process.env.E2E_OIDC_OFFLINE_CHECKBOX?.trim()
     || 'offline_access';
-
-/** PET dev server + `.env.example` use `identifier`; skip slow OIDC-only steps unless consent UI is configured. */
-function usePetStubLoginFlow (): boolean {
-    if (process.env.E2E_HOSTED_LOGISTICS_LOGIN === '1') {
-        return false;
-    }
-    if (process.env.E2E_PET_STUB_LOGIN === '1') {
-        return true;
-    }
-    const idField = process.env.E2E_LOGIN_USER_FIELD_NAME?.trim();
-    if (idField !== 'identifier') {
-        return false;
-    }
-    const base = config.baseUrl.trim().toLowerCase();
-    return base.includes('localhost') || base.includes('127.0.0.1');
-}
 
 setup('Persist logistics web session storage', async ({ page }) => {
     const app = new LogisticsApp(page);
