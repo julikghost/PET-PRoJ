@@ -143,13 +143,20 @@ From the repository root:
 docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
 ```
 
+To **build the UI image first, then run tests** (same order as GitHub Actions: isolate build failures from the Playwright run):
+
+```bash
+docker compose -f docker-compose.e2e.yml build pet-app
+docker compose -f docker-compose.e2e.yml up --no-build --abort-on-container-exit --exit-code-from e2e
+```
+
 When finished, remove containers (and anonymous volumes if any):
 
 ```bash
 docker compose -f docker-compose.e2e.yml down -v
 ```
 
-**GitHub Actions:** the same stack runs in [`.github/workflows/e2e-docker.yml`](.github/workflows/e2e-docker.yml) on pushes and pull requests to `main`. On failure, the workflow uploads `results.xml`, `test-results`, and `allure-results` as the `e2e-docker-artifacts` artifact.
+**GitHub Actions:** the same stack runs in [`.github/workflows/e2e-docker.yml`](.github/workflows/e2e-docker.yml) on pushes and pull requests to `main` — the workflow builds the `pet-app` image first, then starts Compose with `--no-build` and runs Playwright. On failure, the workflow uploads `results.xml`, `test-results`, and `allure-results` as the `e2e-docker-artifacts` artifact.
 
 ## Generate Allure Report
 

@@ -14,10 +14,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Build the PET UI image first; only after a successful image do we start the stack and tests.
+      - name: Build PET UI (pet-app) image
+        run: docker compose -f docker-compose.e2e.yml build pet-app
+
       - name: Run Playwright E2E (PET UI + tests in Docker)
         run: >
           docker compose -f docker-compose.e2e.yml up
-          --build
+          --no-build
           --abort-on-container-exit
           --exit-code-from e2e
 
