@@ -2,6 +2,8 @@
  * Playwright configuration:
  * `logistics_role_smoke` (PET stub login per role), `logistics_session` (persist session),
  * `logistics_web` (CRUD + Reports).
+ *
+ * CI (Docker): headless Chromium; матрица GitHub — один job на `tests/logistics/*.spec.ts`.
  */
 
 import { defineConfig } from '@playwright/test';

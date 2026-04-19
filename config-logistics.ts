@@ -26,6 +26,7 @@ function resolveStorageStatePath (): string {
     if (custom) {
         return path.isAbsolute(custom) ? custom : path.join(process.cwd(), custom);
     }
+
     return path.join(process.cwd(), 'storageState', 'session.json');
 }
 
