@@ -2,10 +2,8 @@
  * Playwright configuration:
  * `logistics_role_smoke` (PET stub login per role), `logistics_session` (persist session),
  * `logistics_web` (CRUD + Reports).
- *
- * GitHub Docker workflow: prep runs `logistics_session` once; matrix jobs run `logistics_web` with `--no-deps`
- * (see `scripts/docker-e2e-run.sh`, `E2E_WEB_NO_DEPS`).
  */
+
 import { defineConfig } from '@playwright/test';
 import { config, storageStatePath } from './config-logistics';
 

@@ -1,11 +1,11 @@
-# Docker-only Playwright E2E: PET UI (`pet-app`) + контейнер `mcr.microsoft.com/playwright`.
-# Матрица по `tests/logistics/*.spec.ts`: один раз собираются role smoke + session (`e2e-docker-prep`),
-# затем каждый шард гоняет только `logistics_web` с `--no-deps` и общим `storageState` артефактом.
+# Один job:
+#   checkout → образ PET UI (pull из GHCR или сборка из PR, `e2e-docker-pet-app.sh`)
+#   → `docker-compose-e2e.sh up` (pet-app + e2e, полный Playwright: role smoke → session → logistics)
+#   → `down` → JUnit в Checks → артефакты при падении (+ results.xml всегда как e2e-junit).
 #
-# Локально (полный цикл без артефакта): docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
+# Локально: docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
 #
-# Креды в CI: Settings → Secrets → Actions (`LOGISTICS_*`). Пустой секрет → дефолт из compose.
-# У форков PR секреты недоступны → те же дефолты.
+# Креды: Secrets → Actions (`LOGISTICS_*`). Форки без секретов — дефолты из compose.
 
 name: E2E (Docker)
 
@@ -26,95 +26,9 @@ permissions:
   packages: read
 
 jobs:
-  e2e-matrix-prep:
-    runs-on: ubuntu-latest
-    outputs:
-      include: ${{ steps.set.outputs.include }}
-    steps:
-      - uses: actions/checkout@v6
-
-      - id: set
-        name: Discover specs (tests/logistics/*.spec.ts)
-        run: |
-          set -euo pipefail
-          if [ ! -d tests/logistics ]; then
-            echo '::error::tests/logistics not found'
-            exit 1
-          fi
-          node <<'NODE'
-          const crypto = require('crypto');
-          const fs = require('fs');
-          const path = require('path');
-
-          const outPath = process.env.GITHUB_OUTPUT;
-          if (!outPath) {
-            console.error('GITHUB_OUTPUT is not set');
-            process.exit(1);
-          }
-
-          const dir = path.join(process.cwd(), 'tests', 'logistics');
-          const include = fs
-            .readdirSync(dir)
-            .filter((f) => f.endsWith('.spec.ts'))
-            .sort()
-            .map((f) => ({
-              name: f.replace(/\.spec\.ts$/, ''),
-              spec: path.posix.join('tests', 'logistics', f),
-            }));
-
-          if (include.length === 0) {
-            console.error('No tests/logistics/*.spec.ts files');
-            process.exit(1);
-          }
-
-          const json = JSON.stringify(include);
-          const delim = `MATRIX_${crypto.randomBytes(16).toString('hex')}`;
-          fs.appendFileSync(outPath, `include<<${delim}\n${json}\n${delim}\n`);
-          NODE
-
-  e2e-docker-prep:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    env:
-      DOCKER_BUILDKIT: 1
-      COMPOSE_DOCKER_CLI_BUILD: 1
-      LOGISTICS_UI_USER_NAME: ${{ secrets.LOGISTICS_UI_USER_NAME }}
-      LOGISTICS_PASSWORD: ${{ secrets.LOGISTICS_PASSWORD }}
-      LOGISTICS_ADMIN_USER_NAME: ${{ secrets.LOGISTICS_ADMIN_USER_NAME }}
-      LOGISTICS_ADMIN_PASSWORD: ${{ secrets.LOGISTICS_ADMIN_PASSWORD }}
-      LOGISTICS_ACCOUNTANT_USER_NAME: ${{ secrets.LOGISTICS_ACCOUNTANT_USER_NAME }}
-      LOGISTICS_ACCOUNTANT_PASSWORD: ${{ secrets.LOGISTICS_ACCOUNTANT_PASSWORD }}
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: PET UI image — GHCR (Docker Image CI) или сборка из PR
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash .github/scripts/e2e-docker-pet-app.sh
-
-      - name: Role smoke + persist session (once per workflow)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash .github/scripts/docker-compose-e2e.sh run --rm e2e bash /work/scripts/docker-e2e-session-prep.sh
-
-      - name: Tear down Compose stack
-        if: always()
-        run: bash .github/scripts/docker-compose-e2e.sh down -v
-
-      - name: Upload Playwright storage state for matrix shards
-        uses: actions/upload-artifact@v7
-        with:
-          name: e2e-storage-state
-          path: storageState/session.json
-          if-no-files-found: error
-          retention-days: 5
-
   e2e-docker:
-    needs:
-      - e2e-matrix-prep
-      - e2e-docker-prep
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       DOCKER_BUILDKIT: 1
       COMPOSE_DOCKER_CLI_BUILD: 1
@@ -124,33 +38,16 @@ jobs:
       LOGISTICS_ADMIN_PASSWORD: ${{ secrets.LOGISTICS_ADMIN_PASSWORD }}
       LOGISTICS_ACCOUNTANT_USER_NAME: ${{ secrets.LOGISTICS_ACCOUNTANT_USER_NAME }}
       LOGISTICS_ACCOUNTANT_PASSWORD: ${{ secrets.LOGISTICS_ACCOUNTANT_PASSWORD }}
-    strategy:
-      fail-fast: false
-      max-parallel: 4
-      matrix:
-        include: ${{ fromJson(needs.e2e-matrix-prep.outputs.include) }}
-
-    name: E2E Docker / ${{ matrix.name }}
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Download Playwright storage state (prep job)
-        uses: actions/download-artifact@v7
-        with:
-          name: e2e-storage-state
-          path: .
-
-      - name: PET UI image — GHCR (Docker Image CI) или сборка из PR
+      - name: PET UI image — GHCR или сборка из PR
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash .github/scripts/e2e-docker-pet-app.sh
 
-      - name: Run Playwright E2E (PET UI + tests in Docker)
-        env:
-          E2E_PLAYWRIGHT_SPEC: ${{ matrix.spec }}
-          E2E_WEB_NO_DEPS: "1"
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Playwright E2E (один compose up)
         run: >
           bash .github/scripts/docker-compose-e2e.sh up
           --no-build
@@ -166,43 +63,43 @@ jobs:
         if: always() && hashFiles('results.xml') != ''
         with:
           files: results.xml
-          check_name: E2E Docker / ${{ matrix.name }}
+          check_name: E2E (Docker)
           comment_mode: off
 
-      - name: Upload JUnit (matrix shard)
+      - name: Upload JUnit
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-junit-${{ matrix.name }}
+          name: e2e-junit
           path: results.xml
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Upload Playwright report and JUnit
+      - name: Upload Playwright artifacts on failure
         if: failure()
         id: upload-e2e
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-docker-${{ matrix.name }}
+          name: e2e-docker
           path: |
             results.xml
             test-results
             allure-results
           if-no-files-found: warn
 
-      - name: Job summary — artifact download link
+      - name: Job summary — artifacts
         if: failure() && steps.upload-e2e.outcome == 'success'
         env:
           ARTIFACT_URL: ${{ steps.upload-e2e.outputs.artifact-url }}
         run: |
           {
-            echo "### E2E artifacts (${{ matrix.name }})"
+            echo "### E2E Docker — артефакты"
             echo ""
             if [ -n "${ARTIFACT_URL:-}" ]; then
-              echo "Download trace / screenshots / **results.xml**: [e2e-docker-${{ matrix.name }}.zip](${ARTIFACT_URL})"
+              echo "Скачать trace / screenshots / **results.xml**: [e2e-docker.zip](${ARTIFACT_URL})"
             else
-              echo "Artifacts uploaded under **e2e-docker-${{ matrix.name }}** — open the job’s **Artifacts** dropdown (ZIP contains \`test-results/\`, traces, screenshots)."
+              echo "Артефакт **e2e-docker** в списке Artifacts job."
             fi
             echo ""
-            echo "Local trace viewer: \`npx playwright show-trace test-results/**/trace.zip\`"
+            echo "Трейсы: \`npx playwright show-trace test-results/**/trace.zip\`"
           } >> "$GITHUB_STEP_SUMMARY"
