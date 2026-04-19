@@ -9,7 +9,7 @@ The app is intentionally test-friendly: role-based login, stable `data-testid` s
 
 ## What the PET app includes
 
-- **Operational modules**: Points, Pet Shipping (movement schedule), Booking.
+- **Operational modules**: Points, Pet Shipping (movement schedule), Booking, Dog Daycare.
 - **Admin module**: Pet Movers directory.
 - **Reports module**: email report flow through GraphQL endpoint.
 - **Roles**:

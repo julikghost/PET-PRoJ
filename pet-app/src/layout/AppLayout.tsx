@@ -24,6 +24,8 @@ export function AppLayout ({ children }: { children: ReactNode }): JSX.Element {
             { key: 'home', label: 'Home' },
             { key: 'schedule', label: 'PetShipping' },
             { key: 'booking', label: 'Booking' },
+            { key: 'dog-daycare', label: 'Dog Daycare' },
+            { key: 'pet-seaters', label: 'Pet Seaters' },
             { key: 'points', label: 'Points' },
         ];
         if (admin) {
@@ -49,6 +51,12 @@ export function AppLayout ({ children }: { children: ReactNode }): JSX.Element {
         }
         if (path.startsWith('/booking')) {
             return ['booking'];
+        }
+        if (path.startsWith('/dog-daycare')) {
+            return ['dog-daycare'];
+        }
+        if (path.startsWith('/pet-seaters')) {
+            return ['pet-seaters'];
         }
         if (path.startsWith('/points')) {
             return ['points'];
@@ -78,6 +86,8 @@ export function AppLayout ({ children }: { children: ReactNode }): JSX.Element {
                             home: '/home',
                             schedule: '/schedule',
                             booking: '/booking',
+                            'dog-daycare': '/dog-daycare',
+                            'pet-seaters': '/pet-seaters',
                             points: '/points',
                             'pet-movers': '/pet-movers',
                             reports: '/reports',

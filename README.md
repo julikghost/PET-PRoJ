@@ -27,7 +27,8 @@ Main application modules:
 
 - Points
 - Pet Shipping
-- Booking (including Dog Daycare pricing logic)
+- Booking
+- Dog Daycare (separate page and flow)
 - Pet Movers
 - Reports (with GraphQL payload checks)
 

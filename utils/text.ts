@@ -14,6 +14,8 @@ export const menu = {
     petMovers: process.env.E2E_UI_MENU_PET_MOVERS || 'PetMovers',
     petShipping: process.env.E2E_UI_MENU_PET_SHIPPING || 'PetShipping',
     booking: process.env.E2E_UI_MENU_BOOKING || 'Booking',
+    dogDaycare: process.env.E2E_UI_MENU_DOG_DAYCARE || 'Dog Daycare',
+    petSeaters: process.env.E2E_UI_MENU_PET_SEATERS || 'Pet Seaters',
     points: process.env.E2E_UI_MENU_POINTS || 'Points',
 };
 
@@ -36,6 +38,22 @@ export const booking = {
     toastCreated: process.env.E2E_UI_BOOKING_TOAST_CREATED || 'Booking created',
     toastUpdated: process.env.E2E_UI_BOOKING_TOAST_UPDATED || 'Booking updated',
     toastDeleted: process.env.E2E_UI_BOOKING_TOAST_DELETED || 'Booking deleted',
+};
+
+export const dogDaycare = {
+    title: process.env.E2E_UI_DOG_DAYCARE_TITLE || 'Dog Daycare',
+    save: process.env.E2E_UI_DOG_DAYCARE_SAVE || 'Save',
+    toastCreated: process.env.E2E_UI_DOG_DAYCARE_TOAST_CREATED || 'Dog daycare created',
+    toastUpdated: process.env.E2E_UI_DOG_DAYCARE_TOAST_UPDATED || 'Dog daycare updated',
+    toastDeleted: process.env.E2E_UI_DOG_DAYCARE_TOAST_DELETED || 'Dog daycare deleted',
+};
+
+export const petSeaters = {
+    title: process.env.E2E_UI_PET_SEATERS_TITLE || 'Pet Seaters',
+    save: process.env.E2E_UI_PET_SEATERS_SAVE || 'Save',
+    toastCreated: process.env.E2E_UI_PET_SEATERS_TOAST_CREATED || 'Pet seater created',
+    toastUpdated: process.env.E2E_UI_PET_SEATERS_TOAST_UPDATED || 'Pet seater updated',
+    toastDeleted: process.env.E2E_UI_PET_SEATERS_TOAST_DELETED || 'Pet seater deleted',
 };
 
 export const points = {

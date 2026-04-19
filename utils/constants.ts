@@ -24,6 +24,14 @@ export const MENU_ITEM = {
         name: menu.booking,
         route: 'booking',
     },
+    DOG_DAYCARE: {
+        name: menu.dogDaycare,
+        route: 'dog-daycare',
+    },
+    PET_SEATERS: {
+        name: menu.petSeaters,
+        route: 'pet-seaters',
+    },
     POINTS: {
         name: menu.points,
         route: 'points',

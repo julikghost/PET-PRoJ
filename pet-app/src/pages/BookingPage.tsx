@@ -219,7 +219,8 @@ export function BookingPage (): JSX.Element {
                 </Button>
             </Space>
             <p style={{ marginBottom: 16, color: petTheme.textMuted }}>
-                Reserve a slot on an existing planned or active pet ship from PetShipping.
+                Reserve a slot on an existing planned or active pet ship from PetShipping. Dog daycare is managed on a
+                separate Dog Daycare page.
             </p>
             <div data-testid="booking-table">
                 <Table<BookingRecord>
