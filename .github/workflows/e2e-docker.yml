@@ -1,4 +1,12 @@
-# Docker-only Playwright E2E: each `tests/logistics/*.spec.ts` is its own matrix job — new specs are picked up automatically.
+# Docker-only Playwright E2E: PET UI (`pet-app`) + контейнер `mcr.microsoft.com/playwright`.
+# Матрица по `tests/logistics/*.spec.ts` — новые спеки подхватываются автоматически.
+#
+# Локально (как в CI): docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
+#
+# Креды в CI: Settings → Secrets and variables → Actions → Repository secrets.
+# Имена совпадают с переменными из корневого `.env` / `.env.example` (LOGISTICS_*).
+# Если секрет не задан, Compose берёт значения по умолчанию из `docker-compose.e2e.yml` (${VAR:-…}).
+# У форков PR секреты недоступны — подставятся те же дефолты.
 
 name: E2E (Docker)
 
@@ -7,9 +15,15 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-docker-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
+  checks: write
 
 jobs:
   e2e-matrix-prep:
@@ -62,6 +76,16 @@ jobs:
     needs: e2e-matrix-prep
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      DOCKER_BUILDKIT: 1
+      COMPOSE_DOCKER_CLI_BUILD: 1
+      # Проброс в `docker compose` для build-args `pet-app` и env сервиса `e2e` (см. docker-compose.e2e.yml).
+      LOGISTICS_UI_USER_NAME: ${{ secrets.LOGISTICS_UI_USER_NAME }}
+      LOGISTICS_PASSWORD: ${{ secrets.LOGISTICS_PASSWORD }}
+      LOGISTICS_ADMIN_USER_NAME: ${{ secrets.LOGISTICS_ADMIN_USER_NAME }}
+      LOGISTICS_ADMIN_PASSWORD: ${{ secrets.LOGISTICS_ADMIN_PASSWORD }}
+      LOGISTICS_ACCOUNTANT_USER_NAME: ${{ secrets.LOGISTICS_ACCOUNTANT_USER_NAME }}
+      LOGISTICS_ACCOUNTANT_PASSWORD: ${{ secrets.LOGISTICS_ACCOUNTANT_PASSWORD }}
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -88,6 +112,23 @@ jobs:
       - name: Tear down Compose stack
         if: always()
         run: docker compose -f docker-compose.e2e.yml down -v
+
+      - name: Publish JUnit to GitHub Checks
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always() && hashFiles('results.xml') != ''
+        with:
+          files: results.xml
+          check_name: E2E Docker / ${{ matrix.name }}
+          comment_mode: off
+
+      - name: Upload JUnit (matrix shard)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-junit-${{ matrix.name }}
+          path: results.xml
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Upload Playwright report and JUnit
         if: failure()
