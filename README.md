@@ -191,6 +191,7 @@ allure open allure-report
 | Allure not showing results | Ensure you ran `npm run e2e` (not with `--reporter=line` override) |
 | Reports test skipped | Add `fixtures.local.json` or set `LOGISTICS_REPORT_FIXTURES_JSON` |
 | Docker E2E fails to pull Playwright image | Check tag in `docker-compose.e2e.yml` matches `@playwright/test` in `package-lock.json` |
+| Docker E2E: login / home never appears | `vite preview` needs an SPA fallback for `/login` etc.; `pet-app/vite-plugin-pet-api.ts` adds it for preview — rebuild the `pet-app` image (`docker compose … build pet-app`) |
 
 ## Important Notes
 

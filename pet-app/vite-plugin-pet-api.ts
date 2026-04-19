@@ -1,5 +1,61 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { Plugin } from 'vite';
+import type { Connect, Plugin, PreviewServer } from 'vite';
+
+/**
+ * `vite preview` serves static files only; deep links like `/login` 404 without this, so React never mounts
+ * in Docker E2E. Serve `dist/index.html` for document navigations (same idea as dev server SPA fallback).
+ */
+function previewSpaFallbackMiddleware (indexPath: string): Connect.NextHandleFunction {
+    let cached: Buffer | null = null;
+    const readIndex = (): Buffer | null => {
+        if (cached) {
+            return cached;
+        }
+        try {
+            cached = fs.readFileSync(indexPath);
+
+            return cached;
+        } catch {
+            return null;
+        }
+    };
+
+    return (req, res, next) => {
+        if (req.method !== 'GET') {
+            next();
+
+            return;
+        }
+        const url = (req.url ?? '').split('?')[0] ?? '';
+        if (url.startsWith('/api')) {
+            next();
+
+            return;
+        }
+        if (url.startsWith('/assets/') || url === '/vite.svg' || url === '/favicon.ico') {
+            next();
+
+            return;
+        }
+        const lastSeg = url.split('/').filter(Boolean).pop() ?? '';
+        if (lastSeg.includes('.') && !lastSeg.endsWith('.html')) {
+            next();
+
+            return;
+        }
+        const html = readIndex();
+        if (!html) {
+            next();
+
+            return;
+        }
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'text/html');
+        res.end(html);
+    };
+}
 
 /**
  * Dev / preview middleware: POST /api/graphql echoes JSON the Playwright Reports POM expects
@@ -45,7 +101,10 @@ export function petApiPlugin (): Plugin {
         configureServer (server) {
             server.middlewares.use(petApiMiddleware());
         },
-        configurePreviewServer (server) {
+        configurePreviewServer (server: PreviewServer) {
+            const indexPath = path.resolve(server.config.root, server.config.build.outDir, 'index.html');
+            // Run before pet API + static: HTML navigations get the SPA shell; `/api` and `/assets/*` pass through.
+            server.middlewares.use(previewSpaFallbackMiddleware(indexPath));
             server.middlewares.use(petApiMiddleware());
         },
     };

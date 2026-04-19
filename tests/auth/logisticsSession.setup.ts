@@ -61,17 +61,17 @@ setup('Persist logistics web session storage', async ({ page }) => {
 
         // Prefer `/login`: Vite preview serves `index.html` for deep links so the stub form mounts immediately.
         // Fallback: open `/` and use the home CTA (client `navigate('/login')`) if the form does not appear.
-        await page.goto(loginUrl, { waitUntil: 'load', timeout: 60000 });
+        await page.goto(loginUrl, { waitUntil: 'load', timeout: 45000 });
         let stubLoginReady = false;
         try {
-            await expect(loginForm).toBeVisible({ timeout: 30000 });
+            await expect(loginForm).toBeVisible({ timeout: 25000 });
             stubLoginReady = true;
         } catch {
-            /* continue to home CTA */
+            /* continue to home CTA (e.g. older preview without SPA fallback) */
         }
         if (!stubLoginReady) {
-            await page.goto(rootUrl, { waitUntil: 'load', timeout: 60000 });
-            await expect(homeSignIn).toBeVisible({ timeout: 60000 });
+            await page.goto(rootUrl, { waitUntil: 'load', timeout: 45000 });
+            await expect(homeSignIn).toBeVisible({ timeout: 25000 });
             await homeSignIn.click();
             await page.waitForURL(/\/login/, { timeout: 20000 });
         }
