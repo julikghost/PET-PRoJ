@@ -48,7 +48,6 @@ setup('Persist logistics web session storage', async ({ page }) => {
         const rootUrl = `${baseUrl.trim().replace(/\/?$/, '/')}`;
         const loginUrl = new URL('login', rootUrl).href;
         const loginForm = page.getByTestId('pet-login-form');
-        const homeSignIn = page.getByTestId('pet-home-sign-in');
 
         await page.context().clearCookies();
         await page.addInitScript(() => {
@@ -59,21 +58,14 @@ setup('Persist logistics web session storage', async ({ page }) => {
             }
         });
 
-        // Prefer `/login`: Vite preview serves `index.html` for deep links so the stub form mounts immediately.
-        // Fallback: open `/` and use the home CTA (client `navigate('/login')`) if the form does not appear.
-        await page.goto(loginUrl, { waitUntil: 'load', timeout: 45000 });
-        let stubLoginReady = false;
+        // Single login surface: `/login` (or `/` → redirect to `/login`).
+        await page.goto(loginUrl, { waitUntil: 'load', timeout: 60000 });
         try {
             await expect(loginForm).toBeVisible({ timeout: 25000 });
-            stubLoginReady = true;
         } catch {
-            /* continue to home CTA (e.g. older preview without SPA fallback) */
-        }
-        if (!stubLoginReady) {
-            await page.goto(rootUrl, { waitUntil: 'load', timeout: 45000 });
-            await expect(homeSignIn).toBeVisible({ timeout: 25000 });
-            await homeSignIn.click();
-            await page.waitForURL(/\/login/, { timeout: 20000 });
+            await page.goto(rootUrl, { waitUntil: 'load', timeout: 60000 });
+            await page.waitForURL(/\/login/, { timeout: 30000 });
+            await expect(loginForm).toBeVisible({ timeout: 30000 });
         }
 
         await app.login.signInPetApp(uiUsername, password);

@@ -3,6 +3,11 @@ import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Connect, Plugin, PreviewServer } from 'vite';
 
+/** Connect stores the middleware stack on `.stack` (used to run SPA fallback before static `sirv`). */
+type ConnectWithStack = Connect.Server & {
+    stack?: { route: string; handle: Connect.NextHandleFunction }[];
+};
+
 /**
  * `vite preview` serves static files only; deep links like `/login` 404 without this, so React never mounts
  * in Docker E2E. Serve `dist/index.html` for document navigations (same idea as dev server SPA fallback).
@@ -103,9 +108,18 @@ export function petApiPlugin (): Plugin {
         },
         configurePreviewServer (server: PreviewServer) {
             const indexPath = path.resolve(server.config.root, server.config.build.outDir, 'index.html');
-            // Run before pet API + static: HTML navigations get the SPA shell; `/api` and `/assets/*` pass through.
-            server.middlewares.use(previewSpaFallbackMiddleware(indexPath));
-            server.middlewares.use(petApiMiddleware());
+            const spa = previewSpaFallbackMiddleware(indexPath);
+            /**
+             * Preview mounts static file middleware first; deep links like `/login` 404 before our handler runs.
+             * Prepend SPA fallback so HTML navigations always receive `index.html`.
+             */
+            const mw = server.middlewares as ConnectWithStack;
+            if (Array.isArray(mw.stack)) {
+                mw.stack.unshift({ route: '', handle: spa });
+            } else {
+                mw.use(spa);
+            }
+            mw.use(petApiMiddleware());
         },
     };
 }

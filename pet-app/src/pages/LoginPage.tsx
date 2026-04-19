@@ -1,5 +1,5 @@
 import { App, Button, Flex, Form, Input } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { BrandLogo } from '../components/BrandLogo';
 import { BRAND_NAME } from '../brand';
 import { petTheme } from '../theme/palette';
@@ -7,6 +7,7 @@ import { ROLE_PET_ACCOUNTANT, ROLE_PET_ADMIN, ROLE_PET_USER } from '../auth';
 
 export function LoginPage (): JSX.Element {
     const navigate = useNavigate();
+    const location = useLocation();
     const { message } = App.useApp();
     const [form] = Form.useForm<{ identifier: string; password: string }>();
     const user = import.meta.env.VITE_PET_USER as string | undefined;
@@ -61,7 +62,21 @@ export function LoginPage (): JSX.Element {
                 role,
             })
         );
-        navigate(role === ROLE_PET_ACCOUNTANT ? '/reports' : '/home');
+        const defaultPath = role === ROLE_PET_ACCOUNTANT ? '/reports' : '/home';
+        const fromState = location.state as { from?: { pathname?: string; search?: string } } | null | undefined;
+        const fromPath = fromState?.from?.pathname;
+        const safeReturn =
+            typeof fromPath === 'string'
+            && fromPath !== '/login'
+            && fromPath !== '/'
+            && !fromPath.includes('..');
+        if (safeReturn) {
+            const search = typeof fromState?.from?.search === 'string' ? fromState.from.search : '';
+            navigate(`${fromPath}${search}`, { replace: true });
+
+            return;
+        }
+        navigate(defaultPath, { replace: true });
     };
 
     return (

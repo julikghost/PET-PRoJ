@@ -25,15 +25,6 @@ export class Login {
 
     async clickLogin (): Promise<void> {
         await test.step('Open authentication flow', async () => {
-            const petEntry = this.page.getByTestId('pet-home-sign-in');
-            if (await petEntry.count()) {
-                await expect(petEntry).toBeVisible();
-                await petEntry.click();
-                await this.page.waitForURL(/\/login/, { timeout: 15000 });
-
-                return;
-            }
-
             const btn = this.page.getByRole('button', { name: new RegExp(loginButton) }).first();
             await expect(btn).toBeVisible();
             await btn.click();
