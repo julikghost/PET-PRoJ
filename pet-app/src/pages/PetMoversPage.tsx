@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Form, Input, Modal, Select, Space, Switch, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { toast } from '../petToast';
@@ -29,6 +29,15 @@ export function PetMoversPage (): JSX.Element {
         Pick<PetMoverRow, 'name' | 'code' | 'active' | 'currency' | 'cars' | 'drivers' | 'movementType'>
     >();
 
+    const movementType = Form.useWatch('movementType', form) as PetMoverMovementType | undefined;
+    const currencyLockedTaxi = movementType === 'taxi';
+
+    useEffect(() => {
+        if (movementType === 'taxi') {
+            form.setFieldsValue({ currency: 'EUR' });
+        }
+    }, [movementType, form]);
+
     const openCreate = useCallback(() => {
         setEditing(null);
         form.resetFields();
@@ -51,7 +60,7 @@ export function PetMoversPage (): JSX.Element {
                 name: record.name,
                 code: record.code,
                 active: record.active,
-                currency: record.currency,
+                currency: record.movementType === 'taxi' ? 'EUR' : record.currency,
                 cars: record.cars,
                 drivers: record.drivers,
                 movementType: record.movementType,
@@ -63,7 +72,11 @@ export function PetMoversPage (): JSX.Element {
 
     const submitModal = useCallback(async () => {
         const v = await form.validateFields();
-        const codeNorm = v.code.trim().toLowerCase();
+        const payload: typeof v = {
+            ...v,
+            currency: v.movementType === 'taxi' ? 'EUR' : v.currency,
+        };
+        const codeNorm = payload.code.trim().toLowerCase();
         const dupOther = (excludeId: string | undefined) =>
             rows.some(
                 (r) => r.id !== excludeId && r.code.trim().toLowerCase() === codeNorm
@@ -78,7 +91,7 @@ export function PetMoversPage (): JSX.Element {
             setRows((prev) =>
                 prev.map((r) =>
                     r.id === editing.id
-                        ? { ...r, ...v }
+                        ? { ...r, ...payload }
                         : r
                 )
             );
@@ -88,7 +101,7 @@ export function PetMoversPage (): JSX.Element {
 
             return;
         } else {
-            setRows((prev) => [...prev, { id: newId(), ...v }]);
+            setRows((prev) => [...prev, { id: newId(), ...payload }]);
             toast.success('PetMover created');
         }
         setModalOpen(false);
@@ -235,10 +248,18 @@ export function PetMoversPage (): JSX.Element {
                     <Form.Item
                         name="currency"
                         label="Currency"
-                        tooltip="Pet ship and booking prices use this tariff currency (EUR / USD rates)."
+                        tooltip={
+                            currencyLockedTaxi
+                                ? 'City taxi movers use EUR only (matches City Taxi pricing).'
+                                : 'Pet ship and booking prices use this tariff currency (EUR / USD rates).'
+                        }
                         rules={[{ required: true }]}
                     >
-                        <Select options={CURRENCY_OPTIONS} data-testid="pet-mover-field-currency" />
+                        <Select
+                            options={CURRENCY_OPTIONS}
+                            disabled={currencyLockedTaxi}
+                            data-testid="pet-mover-field-currency"
+                        />
                     </Form.Item>
                     <Form.Item name="active" label="Active" valuePropName="checked">
                         <Switch data-testid="pet-mover-field-active" />
