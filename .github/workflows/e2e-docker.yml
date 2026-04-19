@@ -1,12 +1,11 @@
 # Docker-only Playwright E2E: PET UI (`pet-app`) + контейнер `mcr.microsoft.com/playwright`.
-# Матрица по `tests/logistics/*.spec.ts` — новые спеки подхватываются автоматически.
+# Матрица по `tests/logistics/*.spec.ts`: один раз собираются role smoke + session (`e2e-docker-prep`),
+# затем каждый шард гоняет только `logistics_web` с `--no-deps` и общим `storageState` артефактом.
 #
-# Локально (как в CI): docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
+# Локально (полный цикл без артефакта): docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
 #
-# Креды в CI: Settings → Secrets and variables → Actions → Repository secrets.
-# Имена совпадают с переменными из корневого `.env` / `.env.example` (LOGISTICS_*).
-# Если секрет не задан, Compose берёт значения по умолчанию из `docker-compose.e2e.yml` (${VAR:-…}).
-# У форков PR секреты недоступны — подставятся те же дефолты.
+# Креды в CI: Settings → Secrets → Actions (`LOGISTICS_*`). Пустой секрет → дефолт из compose.
+# У форков PR секреты недоступны → те же дефолты.
 
 name: E2E (Docker)
 
@@ -24,6 +23,7 @@ concurrency:
 permissions:
   contents: read
   checks: write
+  packages: read
 
 jobs:
   e2e-matrix-prep:
@@ -72,14 +72,52 @@ jobs:
           fs.appendFileSync(outPath, `include<<${delim}\n${json}\n${delim}\n`);
           NODE
 
+  e2e-docker-prep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DOCKER_BUILDKIT: 1
+      COMPOSE_DOCKER_CLI_BUILD: 1
+      LOGISTICS_UI_USER_NAME: ${{ secrets.LOGISTICS_UI_USER_NAME }}
+      LOGISTICS_PASSWORD: ${{ secrets.LOGISTICS_PASSWORD }}
+      LOGISTICS_ADMIN_USER_NAME: ${{ secrets.LOGISTICS_ADMIN_USER_NAME }}
+      LOGISTICS_ADMIN_PASSWORD: ${{ secrets.LOGISTICS_ADMIN_PASSWORD }}
+      LOGISTICS_ACCOUNTANT_USER_NAME: ${{ secrets.LOGISTICS_ACCOUNTANT_USER_NAME }}
+      LOGISTICS_ACCOUNTANT_PASSWORD: ${{ secrets.LOGISTICS_ACCOUNTANT_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: PET UI image — GHCR (Docker Image CI) или сборка из PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/e2e-docker-pet-app.sh
+
+      - name: Role smoke + persist session (once per workflow)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/docker-compose-e2e.sh run --rm e2e bash /work/scripts/docker-e2e-session-prep.sh
+
+      - name: Tear down Compose stack
+        if: always()
+        run: bash .github/scripts/docker-compose-e2e.sh down -v
+
+      - name: Upload Playwright storage state for matrix shards
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-storage-state
+          path: storageState/session.json
+          if-no-files-found: error
+          retention-days: 5
+
   e2e-docker:
-    needs: e2e-matrix-prep
+    needs:
+      - e2e-matrix-prep
+      - e2e-docker-prep
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       DOCKER_BUILDKIT: 1
       COMPOSE_DOCKER_CLI_BUILD: 1
-      # Проброс в `docker compose` для build-args `pet-app` и env сервиса `e2e` (см. docker-compose.e2e.yml).
       LOGISTICS_UI_USER_NAME: ${{ secrets.LOGISTICS_UI_USER_NAME }}
       LOGISTICS_PASSWORD: ${{ secrets.LOGISTICS_PASSWORD }}
       LOGISTICS_ADMIN_USER_NAME: ${{ secrets.LOGISTICS_ADMIN_USER_NAME }}
@@ -97,21 +135,31 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Build PET UI (pet-app) image
-        run: docker compose -f docker-compose.e2e.yml build pet-app
+      - name: Download Playwright storage state (prep job)
+        uses: actions/download-artifact@v7
+        with:
+          name: e2e-storage-state
+          path: .
+
+      - name: PET UI image — GHCR (Docker Image CI) или сборка из PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/e2e-docker-pet-app.sh
 
       - name: Run Playwright E2E (PET UI + tests in Docker)
         env:
           E2E_PLAYWRIGHT_SPEC: ${{ matrix.spec }}
+          E2E_WEB_NO_DEPS: "1"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >
-          docker compose -f docker-compose.e2e.yml up
+          bash .github/scripts/docker-compose-e2e.sh up
           --no-build
           --abort-on-container-exit
           --exit-code-from e2e
 
       - name: Tear down Compose stack
         if: always()
-        run: docker compose -f docker-compose.e2e.yml down -v
+        run: bash .github/scripts/docker-compose-e2e.sh down -v
 
       - name: Publish JUnit to GitHub Checks
         uses: EnricoMi/publish-unit-test-result-action@v2
