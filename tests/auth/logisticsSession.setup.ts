@@ -40,8 +40,12 @@ setup('Persist logistics web session storage', async ({ page }) => {
     const app = new LogisticsApp(page);
 
     if (usePetStubLoginFlow()) {
-        const loginUrl = new URL('login', `${baseUrl.trim().replace(/\/?$/, '/')}`).href;
-        await page.goto(loginUrl);
+        // Always open login via the home CTA. A direct GET `/login` can serve no SPA shell under
+        // `vite preview` (Docker), so `pet-login-form` never appears; client navigation avoids that.
+        const rootUrl = `${baseUrl.trim().replace(/\/?$/, '/')}`;
+        await page.goto(rootUrl);
+        await page.getByTestId('pet-home-sign-in').click();
+        await page.waitForURL(/\/login/, { timeout: 15000 });
         await app.login.signInPetApp(uiUsername, password);
     } else {
         await app.openLogisticsApp();
