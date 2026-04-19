@@ -16,6 +16,38 @@ function petClientRootAndLogin (baseUrl: string): { rootUrl: string; loginUrl: s
     return { rootUrl, loginUrl };
 }
 
+/**
+ * Try to observe a JS response during navigation, but keep it best-effort:
+ * some Docker/Desktop runs serve scripts from cache and emit no `response` event.
+ */
+async function gotoPetClientWaitingForBundle (page: Page, url: string): Promise<void> {
+    const sawBundle = page.waitForResponse(
+        (r) => {
+            if (r.request().resourceType() !== 'script') {
+                return false;
+            }
+            const u = r.url();
+            if (r.status() >= 400) {
+                return false;
+            }
+            return (
+                (u.includes('/assets/') && /\.js(\?|$)/i.test(u))
+                || /\/src\/main\.(t|j)sx?(\?|$)/i.test(u)
+                || /\/@vite\/client(\?|$)/i.test(u)
+            );
+        },
+        { timeout: 20_000 }
+    )
+        .then(() => true)
+        .catch(() => false);
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90_000 });
+    if (!(await sawBundle)) {
+        /** Best-effort settle when script came from cache and no network `response` fired. */
+        await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined);
+    }
+    await page.waitForLoadState('load', { timeout: 60_000 });
+}
+
 /** Fails with a concrete hint if `index.html` loaded but the React bundle never mounted the PET login shell. */
 async function waitForPetLoginFormInDom (page: Page, openedAs: string, timeoutMs: number): Promise<void> {
     try {
@@ -58,7 +90,7 @@ export async function openPetStubLoginPage (page: Page, baseUrl: string): Promis
      * Clear `pet-auth` only after we are on the PET origin. `about:blank` uses an opaque origin, so
      * `localStorage.removeItem('pet-auth')` there does not clear the demo session for `pet-app`.
      */
-    await page.goto(loginUrl, { waitUntil: 'load', timeout: 90_000 });
+    await gotoPetClientWaitingForBundle(page, loginUrl);
     await page.evaluate(() => {
         try {
             localStorage.removeItem('pet-auth');
@@ -73,7 +105,7 @@ export async function openPetStubLoginPage (page: Page, baseUrl: string): Promis
         await expect(loginForm, `PET login form visible (opened ${loginUrl})`).toBeVisible({ timeout: 20_000 });
     } catch {
         /** Fallback: open `/` and wait for the login surface — do not require URL `/login` (SPA redirect can lag or stay on `/` until hydrated). */
-        await page.goto(rootUrl, { waitUntil: 'load', timeout: 90_000 });
+        await gotoPetClientWaitingForBundle(page, rootUrl);
         await page.evaluate(() => {
             try {
                 localStorage.removeItem('pet-auth');
@@ -81,7 +113,7 @@ export async function openPetStubLoginPage (page: Page, baseUrl: string): Promis
                 /* ignore */
             }
         });
-        await page.goto(loginUrl, { waitUntil: 'load', timeout: 90_000 });
+        await gotoPetClientWaitingForBundle(page, loginUrl);
         await waitForPetLoginFormInDom(page, loginUrl, 85_000);
         await expect(loginForm, `PET login form visible after fallback (opened ${loginUrl})`).toBeVisible({
             timeout: 25_000,

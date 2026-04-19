@@ -82,7 +82,10 @@ services:
   e2e:
     image: mcr.microsoft.com/playwright:v1.57.0-noble
     user: root
+    init: true
     shm_size: '2gb'
+    tmpfs:
+      - /tmp:size=1g,exec
     depends_on:
       db:
         condition: service_healthy

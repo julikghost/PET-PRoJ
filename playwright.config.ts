@@ -56,7 +56,12 @@ const dockerChromiumUse =
     process.env.E2E_DOCKER === '1'
         ? {
               launchOptions: {
-                  args: ['--disable-dev-shm-usage'],
+                  args: [
+                      '--disable-dev-shm-usage',
+                      '--no-sandbox',
+                      '--disable-setuid-sandbox',
+                      '--disable-gpu',
+                  ],
               },
           }
         : {};
