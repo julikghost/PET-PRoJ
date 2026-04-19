@@ -4,7 +4,8 @@ PET logistics — GraphQL contract aligned with the PET UI data model (`src/type
 - **Points → pet ships → bookings** live in `localStorage` key `pet-logistics-v1` (demo).
 - **Dog daycare** keeps an internal daycare booking (`bookingRefCode`, `bookingDate`) and does not depend on Booking records.
 - **Pet seaters** are stored in the same key and can be optionally assigned to daycare rows.
-- **Pet movers** directory uses `pet-movers-v1` (name, code, active, tariff `currency`, optional `cars` / `drivers` text; no region).
+- **Pet movers** directory uses `pet-movers-v1` (name, code, active, movement type **shipping** vs **taxi**, tariff `currency`, optional `cars` / `drivers`).
+- **City Taxi** (`/city-taxi`): intra-city address-to-address transport (cats/dogs, EUR-only tariffs); PetShipping uses movers with type **shipping** only.
 - Pet ship **currency** matches the selected Pet Mover; **cars** / **drivers** are copied from that mover when the ship is saved (snapshot on the ship).
 - Booking **petLabels** are **species** names (English catalog), not pet names.
 - **Billing** on bookings is derived from the pet ship tariff for Reports (`cur-eur` / `cur-usd` mapping).
@@ -59,6 +60,12 @@ enum DogDaycareStatus {
   CHECKED_OUT
 }
 
+"""Pet mover serves either network shipping (PetShipping) or city taxi — mutually exclusive."""
+enum PetMoverMovementType {
+  SHIPPING
+  TAXI
+}
+
 # --- Read models ---
 
 type Query {
@@ -91,6 +98,7 @@ type PetMover {
   name: String!
   code: String!
   active: Boolean!
+  movementType: PetMoverMovementType!
   currency: TariffCurrency!
   """Optional free text; copied onto pet ships when saved."""
   cars: String
@@ -195,6 +203,7 @@ input PetMoverInput {
   name: String!
   code: String!
   active: Boolean!
+  movementType: PetMoverMovementType!
   currency: TariffCurrency!
   cars: String
   drivers: String

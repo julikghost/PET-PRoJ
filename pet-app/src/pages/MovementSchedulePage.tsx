@@ -63,7 +63,10 @@ export function MovementSchedulePage (): JSX.Element {
         [points, pointOptionLabel]
     );
 
-    const petMoverOptions = useMemo(() => petMoverSelectOptions(petMovers, 'name'), [petMovers]);
+    const petMoverOptions = useMemo(
+        () => petMoverSelectOptions(petMovers, 'name', (m) => m.movementType === 'shipping'),
+        [petMovers]
+    );
 
     /** Include legacy `petMover` string if it no longer matches an active row (editing old ships). */
     const petMoverOptionsForModal = useMemo(() => {
@@ -147,7 +150,7 @@ export function MovementSchedulePage (): JSX.Element {
             return;
         }
         if (petMoverOptions.length === 0) {
-            toast.error('Add at least one active PetMover under PetMovers first');
+            toast.error('Add at least one active PetMover with type Shipping under PetMovers first');
 
             return;
         }
@@ -321,8 +324,8 @@ export function MovementSchedulePage (): JSX.Element {
                         type="warning"
                         showIcon
                         style={{ marginBottom: 16 }}
-                        message="No active PetMover"
-                        description="Add at least one active PetMover under PetMovers, then create a pet ship."
+                        message="No active shipping PetMover"
+                        description='Add at least one active PetMover with movement type "Shipping" under PetMovers, then create a pet ship.'
                     />
                 ) : null}
                 <Form data-testid="schedule-form" form={form} layout="vertical" className="ant-form">

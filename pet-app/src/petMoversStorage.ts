@@ -1,16 +1,21 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import type { PetShipCurrency } from './types/petLogistics';
 
+/** Pet mover serves either point-to-point shipping (PetShipping) or city taxi (City Taxi). */
+export type PetMoverMovementType = 'shipping' | 'taxi';
+
 export type PetMoverRow = {
     id: string;
     name: string;
     code: string;
     active: boolean;
-    /** Tariff / booking currency (PetShipping & booking pricing follow this). */
+    /** Tariff / booking currency (PetShipping & booking pricing follow this). City taxi UI is EUR-only. */
     currency: PetShipCurrency;
     /** Optional; copied onto pet ships when saved. */
     cars: string;
     drivers: string;
+    /** One mover is either shipping or taxi (not both). */
+    movementType: PetMoverMovementType;
 };
 
 export const PET_MOVERS_STORAGE_KEY = 'pet-movers-v1';
@@ -33,6 +38,9 @@ function parsePetMoverRow (x: unknown): PetMoverRow | null {
         return null;
     }
 
+    const movementType: PetMoverMovementType =
+        o.movementType === 'taxi' ? 'taxi' : 'shipping';
+
     return {
         id: o.id,
         name: o.name,
@@ -41,6 +49,7 @@ function parsePetMoverRow (x: unknown): PetMoverRow | null {
         currency: o.currency === 'USD' ? 'USD' : 'EUR',
         cars: typeof o.cars === 'string' ? o.cars : '',
         drivers: typeof o.drivers === 'string' ? o.drivers : '',
+        movementType,
     };
 }
 
@@ -68,10 +77,11 @@ export function loadPetMovers (): PetMoverRow[] {
  */
 export function petMoverSelectOptions (
     rows: PetMoverRow[],
-    valueKey: 'id' | 'name'
+    valueKey: 'id' | 'name',
+    filter?: (row: PetMoverRow) => boolean
 ): { value: string; label: string }[] {
     return rows
-        .filter((m) => m.active)
+        .filter((m) => m.active && (filter ? filter(m) : true))
         .map((m) => ({
             value: m[valueKey],
             label: `${m.name} (${m.code})`,

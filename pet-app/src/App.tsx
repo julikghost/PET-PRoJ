@@ -18,6 +18,7 @@ import { PointsPage } from './pages/PointsPage';
 import { DashboardHome } from './pages/DashboardHome';
 import { DogDaycarePage } from './pages/DogDaycarePage';
 import { PetSeatersPage } from './pages/PetSeatersPage';
+import { CityTaxiPage } from './pages/CityTaxiPage';
 
 function useAuthed (): boolean {
     return getAuthSession() != null;
@@ -102,6 +103,14 @@ export function App (): JSX.Element {
                 element={
                     <OperationalShell>
                         <MovementSchedulePage />
+                    </OperationalShell>
+                }
+            />
+            <Route
+                path="/city-taxi"
+                element={
+                    <OperationalShell>
+                        <CityTaxiPage />
                     </OperationalShell>
                 }
             />

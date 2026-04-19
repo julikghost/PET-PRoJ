@@ -31,7 +31,10 @@ export function ReportsPage (): JSX.Element {
 
     const initialRange: [Dayjs, Dayjs] = [dayjs().startOf('month'), dayjs().endOf('month')];
 
-    const petMoverOptions = useMemo(() => petMoverSelectOptions(petMovers, 'id'), [petMovers]);
+    const petMoverOptions = useMemo(
+        () => petMoverSelectOptions(petMovers, 'id', (m) => m.movementType === 'shipping'),
+        [petMovers]
+    );
 
     const hasActivePetMovers = petMoverOptions.length > 0;
 
@@ -56,8 +59,8 @@ export function ReportsPage (): JSX.Element {
                         type="warning"
                         showIcon
                         style={{ marginBottom: 16 }}
-                        message="No active PetMover to select"
-                        description="Add at least one active PetMover under PetMovers, then return here."
+                        message="No active shipping PetMover to select"
+                        description='Add at least one active PetMover with movement type "Shipping" under PetMovers, then return here.'
                     />
                 ) : null}
                 <Form.Item

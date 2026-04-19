@@ -27,9 +27,10 @@ Main application modules:
 
 - Points
 - Pet Shipping
+- City Taxi (intra-city address-to-address transport for cats/dogs in selected FR/DE/GB cities; EUR-only tariffs; optional Google Maps when `VITE_GOOGLE_MAPS_API_KEY` is set)
 - Booking
 - Dog Daycare (separate page and flow)
-- Pet Movers
+- Pet Movers (movement type **Shipping** vs **Taxi**; Pet Shipping and Reports use **Shipping** movers only)
 - Reports (with GraphQL payload checks)
 
 Core automation practices:

@@ -9,8 +9,8 @@ The app is intentionally test-friendly: role-based login, stable `data-testid` s
 
 ## What the PET app includes
 
-- **Operational modules**: Points, Pet Shipping (movement schedule), Booking, Dog Daycare.
-- **Admin module**: Pet Movers directory.
+- **Operational modules**: Points, Pet Shipping (movement schedule), City Taxi (`/city-taxi` — not part of shipping; major cities in France, Germany, UK; cats/dogs; EUR-only; map/Places when `VITE_GOOGLE_MAPS_API_KEY` is set), Booking, Dog Daycare.
+- **Admin module**: Pet Movers directory (each mover is **Shipping** or **Taxi**; shipping schedule and reports list **Shipping** movers only; City Taxi lists **Taxi** movers only).
 - **Reports module**: email report flow through GraphQL endpoint.
 - **Roles**:
   - `PetUser`: operational pages.

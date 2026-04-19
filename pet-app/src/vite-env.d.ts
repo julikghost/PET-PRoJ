@@ -9,6 +9,8 @@ interface ImportMetaEnv {
     /** Login that receives role PetAccountant (Reports sidebar only). */
     readonly VITE_PET_ACCOUNTANT_USER?: string;
     readonly VITE_PET_ACCOUNTANT_PASSWORD?: string;
+    /** Optional: enables Places search + route preview on City Taxi (`/city-taxi`). Without it, manual distance entry works. */
+    readonly VITE_GOOGLE_MAPS_API_KEY?: string;
 }
 
 interface ImportMeta {

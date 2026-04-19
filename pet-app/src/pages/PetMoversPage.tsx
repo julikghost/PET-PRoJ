@@ -2,9 +2,14 @@ import { useCallback, useMemo, useState } from 'react';
 import { Button, Form, Input, Modal, Select, Space, Switch, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { toast } from '../petToast';
-import { type PetMoverRow, usePetMovers } from '../petMoversStorage';
+import { type PetMoverMovementType, type PetMoverRow, usePetMovers } from '../petMoversStorage';
 
 export type { PetMoverRow } from '../petMoversStorage';
+
+const MOVEMENT_TYPE_OPTIONS: { value: PetMoverMovementType; label: string }[] = [
+    { value: 'shipping', label: 'Shipping (PetShipping)' },
+    { value: 'taxi', label: 'Taxi (city delivery)' },
+];
 
 const CURRENCY_OPTIONS = [
     { value: 'EUR', label: 'EUR' },
@@ -20,12 +25,22 @@ export function PetMoversPage (): JSX.Element {
     const [rows, setRows] = usePetMovers();
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<PetMoverRow | null>(null);
-    const [form] = Form.useForm<Pick<PetMoverRow, 'name' | 'code' | 'active' | 'currency' | 'cars' | 'drivers'>>();
+    const [form] = Form.useForm<
+        Pick<PetMoverRow, 'name' | 'code' | 'active' | 'currency' | 'cars' | 'drivers' | 'movementType'>
+    >();
 
     const openCreate = useCallback(() => {
         setEditing(null);
         form.resetFields();
-        form.setFieldsValue({ name: '', code: '', active: true, currency: 'EUR', cars: '', drivers: '' });
+        form.setFieldsValue({
+            name: '',
+            code: '',
+            active: true,
+            currency: 'EUR',
+            cars: '',
+            drivers: '',
+            movementType: 'shipping',
+        });
         setModalOpen(true);
     }, [form]);
 
@@ -39,6 +54,7 @@ export function PetMoversPage (): JSX.Element {
                 currency: record.currency,
                 cars: record.cars,
                 drivers: record.drivers,
+                movementType: record.movementType,
             });
             setModalOpen(true);
         },
@@ -97,6 +113,12 @@ export function PetMoversPage (): JSX.Element {
         () => [
             { title: 'Name', dataIndex: 'name', key: 'name' },
             { title: 'Code', dataIndex: 'code', key: 'code', width: 140 },
+            {
+                title: 'Type',
+                key: 'movementType',
+                width: 140,
+                render: (_, record) => (record.movementType === 'taxi' ? 'Taxi' : 'Shipping'),
+            },
             { title: 'Curr.', dataIndex: 'currency', key: 'currency', width: 64 },
             {
                 title: 'Active',
@@ -174,13 +196,27 @@ export function PetMoversPage (): JSX.Element {
                     form={form}
                     layout="vertical"
                     className="ant-form"
-                    initialValues={{ active: true, currency: 'EUR', cars: '', drivers: '' }}
+                    initialValues={{
+                        active: true,
+                        currency: 'EUR',
+                        cars: '',
+                        drivers: '',
+                        movementType: 'shipping',
+                    }}
                 >
                     <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Required' }]}>
                         <Input data-testid="pet-mover-field-name" />
                     </Form.Item>
                     <Form.Item name="code" label="Code" rules={[{ required: true, message: 'Required' }]}>
                         <Input data-testid="pet-mover-field-code" />
+                    </Form.Item>
+                    <Form.Item
+                        name="movementType"
+                        label="Movement type"
+                        rules={[{ required: true, message: 'Required' }]}
+                        tooltip="Shipping is used for PetShipping routes. Taxi is used for city address-to-address delivery."
+                    >
+                        <Select options={MOVEMENT_TYPE_OPTIONS} data-testid="pet-mover-field-movement-type" />
                     </Form.Item>
                     <Form.Item name="cars" label="Cars">
                         <Input.TextArea

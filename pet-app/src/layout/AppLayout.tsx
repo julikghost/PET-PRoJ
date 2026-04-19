@@ -23,6 +23,7 @@ export function AppLayout ({ children }: { children: ReactNode }): JSX.Element {
         const items: NonNullable<MenuProps['items']> = [
             { key: 'home', label: 'Home' },
             { key: 'schedule', label: 'PetShipping' },
+            { key: 'city-taxi', label: 'City Taxi' },
             { key: 'booking', label: 'Booking' },
             { key: 'dog-daycare', label: 'Dog Daycare' },
             { key: 'pet-seaters', label: 'Pet Seaters' },
@@ -48,6 +49,9 @@ export function AppLayout ({ children }: { children: ReactNode }): JSX.Element {
         }
         if (path.startsWith('/schedule')) {
             return ['schedule'];
+        }
+        if (path.startsWith('/city-taxi')) {
+            return ['city-taxi'];
         }
         if (path.startsWith('/booking')) {
             return ['booking'];
@@ -85,6 +89,7 @@ export function AppLayout ({ children }: { children: ReactNode }): JSX.Element {
                         const routes: Record<string, string> = {
                             home: '/home',
                             schedule: '/schedule',
+                            'city-taxi': '/city-taxi',
                             booking: '/booking',
                             'dog-daycare': '/dog-daycare',
                             'pet-seaters': '/pet-seaters',
