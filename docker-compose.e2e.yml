@@ -1,6 +1,9 @@
 # PET UI + Playwright E2E in Docker (CI / local parity). From repo root:
 #   docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
 #
+# Optional: run one logistics spec (session project still runs first via Playwright dependencies):
+#   E2E_PLAYWRIGHT_SPEC=tests/logistics/booking.spec.ts docker compose -f docker-compose.e2e.yml up ...
+#
 # Compose reads the repo-root `.env` for ${VAR:-default} substitution (same names as local E2E).
 # Inside the stack, URLs must target `pet-app`, not `localhost`. Build args align the UI bundle with those creds.
 services:
@@ -53,5 +56,9 @@ services:
       E2E_PET_STUB_LOGIN: "1"
       E2E_DOCKER: "1"
       CI: "true"
-    command: >
-      bash -lc "npm ci && npx playwright test --config=playwright.config.ts"
+      # Host may set this (e.g. CI matrix); empty = full suite. Passed into the container for the shell below.
+      E2E_PLAYWRIGHT_SPEC: ${E2E_PLAYWRIGHT_SPEC:-}
+    # Script avoids Compose `$…` interpolation eating the runtime `E2E_PLAYWRIGHT_SPEC` from the container env.
+    command:
+      - bash
+      - /work/scripts/docker-e2e-run.sh

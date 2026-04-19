@@ -40,12 +40,42 @@ setup('Persist logistics web session storage', async ({ page }) => {
     const app = new LogisticsApp(page);
 
     if (usePetStubLoginFlow()) {
-        // Always open login via the home CTA. A direct GET `/login` can serve no SPA shell under
-        // `vite preview` (Docker), so `pet-login-form` never appears; client navigation avoids that.
+        if (!baseUrl?.trim()) {
+            throw new Error(
+                'LOGISTICS_BASE_CLIENT_URL is empty — set it (e.g. http://pet-app:5173/ in Docker Compose).'
+            );
+        }
         const rootUrl = `${baseUrl.trim().replace(/\/?$/, '/')}`;
-        await page.goto(rootUrl);
-        await page.getByTestId('pet-home-sign-in').click();
-        await page.waitForURL(/\/login/, { timeout: 15000 });
+        const loginUrl = new URL('login', rootUrl).href;
+        const loginForm = page.getByTestId('pet-login-form');
+        const homeSignIn = page.getByTestId('pet-home-sign-in');
+
+        await page.context().clearCookies();
+        await page.addInitScript(() => {
+            try {
+                localStorage.removeItem('pet-auth');
+            } catch {
+                /* ignore */
+            }
+        });
+
+        // Prefer `/login`: Vite preview serves `index.html` for deep links so the stub form mounts immediately.
+        // Fallback: open `/` and use the home CTA (client `navigate('/login')`) if the form does not appear.
+        await page.goto(loginUrl, { waitUntil: 'load', timeout: 60000 });
+        let stubLoginReady = false;
+        try {
+            await expect(loginForm).toBeVisible({ timeout: 30000 });
+            stubLoginReady = true;
+        } catch {
+            /* continue to home CTA */
+        }
+        if (!stubLoginReady) {
+            await page.goto(rootUrl, { waitUntil: 'load', timeout: 60000 });
+            await expect(homeSignIn).toBeVisible({ timeout: 60000 });
+            await homeSignIn.click();
+            await page.waitForURL(/\/login/, { timeout: 20000 });
+        }
+
         await app.login.signInPetApp(uiUsername, password);
     } else {
         await app.openLogisticsApp();

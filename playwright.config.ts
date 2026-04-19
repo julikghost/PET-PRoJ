@@ -44,6 +44,10 @@ export default defineConfig({
             name: 'logistics_session',
             testDir: './tests/auth',
             testMatch: /.*logisticsSession\.setup\.ts/,
+            use: {
+                ...defaultOptions,
+                ...(baseUrl.trim() ? { baseURL: baseUrl } : {}),
+            },
         },
         {
             name: 'logistics_web',

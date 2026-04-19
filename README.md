@@ -156,7 +156,14 @@ When finished, remove containers (and anonymous volumes if any):
 docker compose -f docker-compose.e2e.yml down -v
 ```
 
-**GitHub Actions:** the same stack runs in [`.github/workflows/e2e-docker.yml`](.github/workflows/e2e-docker.yml) on pushes and pull requests to `main` — the workflow builds the `pet-app` image first, then starts Compose with `--no-build` and runs Playwright. On failure, the workflow uploads `results.xml`, `test-results`, and `allure-results` as the `e2e-docker-artifacts` artifact.
+**GitHub Actions:** the same stack runs in [`.github/workflows/e2e-docker.yml`](.github/workflows/e2e-docker.yml) on pushes and pull requests to `main` — the workflow uses a **matrix**: each logistics spec is a **separate job** (named `E2E Docker / points`, `/ booking`, …) so the Actions UI shows per-file results. Each job builds the `pet-app` image, then runs Compose with `--no-build` and sets `E2E_PLAYWRIGHT_SPEC` to that file (`logistics_session` still runs first because of Playwright project `dependencies`). On failure, artifacts are uploaded as `e2e-docker-artifacts-<name>`.
+
+To run **one** spec locally in Docker (same variable as CI):
+
+```bash
+docker compose -f docker-compose.e2e.yml build pet-app
+E2E_PLAYWRIGHT_SPEC=tests/logistics/booking.spec.ts docker compose -f docker-compose.e2e.yml up --no-build --abort-on-container-exit --exit-code-from e2e
+```
 
 ## Generate Allure Report
 

@@ -7,9 +7,22 @@ on:
     branches: [main]
 
 jobs:
+  # One GitHub Actions job per Playwright spec file: clear pass/fail in the UI; each job builds pet-app (parallel cap below limits load).
   e2e-docker:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - { name: points, spec: tests/logistics/00-points.spec.ts }
+          - { name: booking, spec: tests/logistics/booking.spec.ts }
+          - { name: pet-shipping, spec: tests/logistics/petShipping.spec.ts }
+          - { name: pet-movers, spec: tests/logistics/petMovers.spec.ts }
+          - { name: reports, spec: tests/logistics/reports.spec.ts }
+
+    name: E2E Docker / ${{ matrix.name }}
 
     steps:
       - uses: actions/checkout@v4
@@ -19,6 +32,8 @@ jobs:
         run: docker compose -f docker-compose.e2e.yml build pet-app
 
       - name: Run Playwright E2E (PET UI + tests in Docker)
+        env:
+          E2E_PLAYWRIGHT_SPEC: ${{ matrix.spec }}
         run: >
           docker compose -f docker-compose.e2e.yml up
           --no-build
@@ -33,7 +48,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-docker-artifacts
+          name: e2e-docker-artifacts-${{ matrix.name }}
           path: |
             results.xml
             test-results
