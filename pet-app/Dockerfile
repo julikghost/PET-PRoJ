@@ -31,12 +31,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package.json package-lock.json ./
-# `vite` / `vite preview` live in devDependencies; production-only `npm ci` would omit them.
-RUN npm ci --include=dev
+# Reuse the build stage `node_modules` (includes `vite` from devDependencies) — avoids a second
+# `npm ci --include=dev`, which is slow and often hits CI timeouts.
+COPY --from=build /app/node_modules ./node_modules
 
 COPY vite.config.ts vite-plugin-pet-api.ts index.html tsconfig.json ./
-COPY src ./src
-COPY public ./public
 COPY --from=build /app/dist ./dist
 
 EXPOSE 5173

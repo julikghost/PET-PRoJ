@@ -16,16 +16,26 @@ const defaultOptions = {
     trace: 'retain-on-failure' as const,
 };
 
+/** One line per test in stdout (used by `docker-compose.e2e.yml`). JUnit + Allure stay enabled. */
+const reporters =
+    process.env.E2E_DOCKER === '1'
+        ? [
+              ['list'] as const,
+              ['junit', { outputFile: 'results.xml' }] as const,
+              ['allure-playwright'] as const,
+          ]
+        : [
+              ['junit', { outputFile: 'results.xml' }] as const,
+              ['allure-playwright'] as const,
+          ];
+
 export default defineConfig({
     timeout: 80000,
     use: {
         actionTimeout: 40000,
     },
     workers: 1,
-    reporter: [
-        ['junit', { outputFile: 'results.xml' }],
-        ['allure-playwright'],
-    ],
+    reporter: reporters,
     expect: {
         timeout: 12000,
     },

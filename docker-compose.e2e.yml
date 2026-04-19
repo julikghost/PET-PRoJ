@@ -41,6 +41,7 @@ services:
       E2E_LOGIN_USER_FIELD_NAME: identifier
       E2E_TIME_ZONE: UTC
       E2E_PET_STUB_LOGIN: "1"
+      E2E_DOCKER: "1"
       CI: "true"
     command: >
       bash -lc "npm ci && npx playwright test --config=playwright.config.ts"

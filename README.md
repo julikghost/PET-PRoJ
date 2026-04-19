@@ -133,7 +133,7 @@ npx playwright test tests/logistics/booking.spec.ts --project=logistics_web
 
 ### Run E2E in Docker
 
-The stack builds **pet-app** from `pet-app/Dockerfile`, waits until it is healthy, then runs the full Playwright suite in the **Playwright** image (`docker-compose.e2e.yml`). URLs point at `http://pet-app:5173/` inside the Compose network; `E2E_PET_STUB_LOGIN=1` is set there so the PET login form flow is used (not OIDC).
+The stack builds **pet-app** from `pet-app/Dockerfile`, waits until it is healthy, then runs the full Playwright suite in the **Playwright** image (`docker-compose.e2e.yml`). URLs point at `http://pet-app:5173/` inside the Compose network; `E2E_PET_STUB_LOGIN=1` is set there so the PET login form flow is used (not OIDC). With `E2E_DOCKER=1`, Playwright adds the **`list`** reporter so each spec shows a pass/fail line in the container logs (JUnit and Allure are unchanged).
 
 **Requirements:** Docker Engine and Docker Compose v2.
 
