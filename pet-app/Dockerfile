@@ -40,7 +40,7 @@ COPY --from=build /app/dist ./dist
 
 EXPOSE 5173
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD node -e "require('http').get('http://127.0.0.1:5173/',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD node -e "require('http').get('http://127.0.0.1:5173/login',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
 CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "5173"]

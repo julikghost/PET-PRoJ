@@ -49,6 +49,8 @@ export default defineConfig({
             name: 'logistics_role_smoke',
             testDir: './tests/auth',
             testMatch: /roleLogin\.smoke\.spec\.ts/,
+            /** PET stub: `openPetStubLoginPage` may chain `/login` → `/` fallback (worst-case nav + waits can exceed 5 min). */
+            timeout: 320_000,
             use: {
                 ...defaultOptions,
                 ...(baseUrl.trim() ? { baseURL: baseUrl } : {}),
@@ -58,6 +60,7 @@ export default defineConfig({
             name: 'logistics_session',
             testDir: './tests/auth',
             testMatch: /.*logisticsSession\.setup\.ts/,
+            timeout: 320_000,
             use: {
                 ...defaultOptions,
                 ...(baseUrl.trim() ? { baseURL: baseUrl } : {}),

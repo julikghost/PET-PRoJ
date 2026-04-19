@@ -25,18 +25,19 @@ services:
         VITE_PET_ACCOUNTANT_PASSWORD: ${LOGISTICS_ACCOUNTANT_PASSWORD:-pet-accountant-secret}
     expose:
       - "5173"
+    # `/login` ensures SPA fallback runs (same as Playwright); `/` alone can be 200 before preview is fully ready on slow CI runners.
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "require('http').get('http://127.0.0.1:5173/',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+          "require('http').get('http://127.0.0.1:5173/login',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
         ]
       interval: 5s
       timeout: 5s
-      retries: 12
-      start_period: 25s
+      retries: 18
+      start_period: 50s
 
   e2e:
     image: mcr.microsoft.com/playwright:v1.57.0-noble

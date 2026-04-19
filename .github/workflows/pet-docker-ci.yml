@@ -47,9 +47,30 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build PET UI image
+        env:
+          LOGISTICS_UI_USER_NAME: ${{ secrets.LOGISTICS_UI_USER_NAME }}
+          LOGISTICS_PASSWORD: ${{ secrets.LOGISTICS_PASSWORD }}
+          LOGISTICS_ADMIN_USER_NAME: ${{ secrets.LOGISTICS_ADMIN_USER_NAME }}
+          LOGISTICS_ADMIN_PASSWORD: ${{ secrets.LOGISTICS_ADMIN_PASSWORD }}
+          LOGISTICS_ACCOUNTANT_USER_NAME: ${{ secrets.LOGISTICS_ACCOUNTANT_USER_NAME }}
+          LOGISTICS_ACCOUNTANT_PASSWORD: ${{ secrets.LOGISTICS_ACCOUNTANT_PASSWORD }}
         run: |
           set -euo pipefail
+          # Align bundle `VITE_PET_*` with E2E compose (same as `docker-compose.e2e.yml` build args).
+          # Without this, GHCR images use Dockerfile defaults while Playwright uses secrets → login failures.
+          U="${LOGISTICS_UI_USER_NAME:-pet@example.com}"
+          P="${LOGISTICS_PASSWORD:-pet-secret}"
+          AU="${LOGISTICS_ADMIN_USER_NAME:-pet-admin@example.com}"
+          AP="${LOGISTICS_ADMIN_PASSWORD:-pet-admin-secret}"
+          CU="${LOGISTICS_ACCOUNTANT_USER_NAME:-pet-accountant@example.com}"
+          CP="${LOGISTICS_ACCOUNTANT_PASSWORD:-pet-accountant-secret}"
           docker build ./pet-app \
+            --build-arg "VITE_PET_USER=$U" \
+            --build-arg "VITE_PET_PASSWORD=$P" \
+            --build-arg "VITE_PET_ADMIN_USER=$AU" \
+            --build-arg "VITE_PET_ADMIN_PASSWORD=$AP" \
+            --build-arg "VITE_PET_ACCOUNTANT_USER=$CU" \
+            --build-arg "VITE_PET_ACCOUNTANT_PASSWORD=$CP" \
             --tag "${PET_APP_IMAGE_PREFIX}:${GITHUB_SHA}"
 
       - name: Push SHA tag

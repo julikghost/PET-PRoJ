@@ -26,12 +26,13 @@ export async function openPetStubLoginPage (page: Page, baseUrl: string): Promis
         }
     });
 
-    await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    /** `load` waits for subresources; `domcontentloaded` alone can fire before the Vite/React bundle runs (form never mounts). */
+    await page.goto(loginUrl, { waitUntil: 'load', timeout: 90_000 });
     try {
-        await expect(loginForm).toBeVisible({ timeout: 30000 });
+        await expect(loginForm).toBeVisible({ timeout: 45_000 });
     } catch {
         /** Fallback: open `/` and wait for the login surface — do not require URL `/login` (SPA redirect can lag or stay on `/` until hydrated). */
-        await page.goto(rootUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-        await expect(loginForm).toBeVisible({ timeout: 60000 });
+        await page.goto(rootUrl, { waitUntil: 'load', timeout: 90_000 });
+        await expect(loginForm).toBeVisible({ timeout: 90_000 });
     }
 }
