@@ -31,7 +31,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# `vite` / `vite preview` live in devDependencies; production-only `npm ci` would omit them.
+RUN npm ci --include=dev
 
 COPY vite.config.ts vite-plugin-pet-api.ts index.html tsconfig.json ./
 COPY src ./src
