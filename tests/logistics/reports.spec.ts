@@ -51,8 +51,11 @@ test.describe('Reports', () => {
 
     test('Send report by email with updated filters', async ({ page }) => {
         test.skip(
-            !config.adminUsername || !config.adminPassword,
-            'Set LOGISTICS_ADMIN_USER_NAME and LOGISTICS_ADMIN_PASSWORD: Reports precondition creates PetMover via PetMovers (PetAdmin only).'
+            !config.adminUsername
+            || !config.adminPassword
+            || !config.accountantUsername
+            || !config.accountantPassword,
+            'Set LOGISTICS_ADMIN_* (create PetMover in PetMovers) and LOGISTICS_ACCOUNTANT_* (Reports UI is for PetAccountant / financial manager).'
         );
 
         // --- Fixture unpack: labels, id maps, and expected GraphQL fragment ---
@@ -83,13 +86,20 @@ test.describe('Reports', () => {
             });
             petMoverCodeForTeardown = petMoverCode;
 
+            // Reports form (incl. `data-testid="pet-reports-pet-mover"`) is used as PetAccountant; admin only for PetMovers precondition.
+            await app.loginAsPetAccountant();
+
             const base = config.baseUrl.trim().replace(/\/?$/, '');
             await page.goto(`${base}/reports`, { waitUntil: 'domcontentloaded' });
+            await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible({ timeout: 20000 });
+            await expect(page.getByTestId(REPORTS_DATA_TESTID.petMoverField)).toBeVisible({
+                timeout: 20000,
+            });
 
             await app.reports.field.selectOptions({
                 name: reports.petMover,
                 options: petMoverUi.label,
-                testId: REPORTS_DATA_TESTID.petMoverSelect,
+                testId: REPORTS_DATA_TESTID.petMoverField,
             });
             await app.reports.field.fillDateRange({ name: reports.dateRange, startDate, endDate });
             await app.reports.field.selectOptions({ name: reports.paymentType, options: uiPaymentMethods });
@@ -205,6 +215,7 @@ test.describe('Reports', () => {
         } finally {
             if (petMoverCodeForTeardown) {
                 try {
+                    await app.loginAsPetAdmin();
                     await app.deletePetMoverByCode(petMoverCodeForTeardown);
                 } catch {
                     /* ignore */

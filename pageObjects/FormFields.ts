@@ -63,7 +63,7 @@ export class FormFields {
     }: {
         name: string;
         options: string | string[];
-        /** When set, must match Ant `Select` root `data-testid` (avoids label/`input` drift, e.g. Reports PetMover). */
+        /** When set: `data-testid` on Ant `Select` **or** parent `Form.Item` (use field wrapper if Select node is absent in DOM). */
         testId?: string;
     }) {
         await test.step(`Select option(s) in the '${name}' field`, async () => {
@@ -72,10 +72,13 @@ export class FormFields {
             let selectTrigger: Locator;
 
             if (testId?.trim()) {
-                selectTrigger = this.page.getByTestId(testId.trim());
-                await expect(selectTrigger, `Select [data-testid="${testId}"]`).toBeVisible({
+                const anchor = this.page.getByTestId(testId.trim());
+                await expect(anchor, `[data-testid="${testId}"]`).toBeVisible({
                     timeout: 20000,
                 });
+                const innerSelect = anchor.locator('.ant-select').first();
+                selectTrigger = (await innerSelect.count()) > 0 ? innerSelect : anchor;
+                await expect(selectTrigger).toBeVisible({ timeout: 5000 });
             } else {
                 const fieldLocator = this.fieldsLocator.filter({ hasText: name }).first();
                 await expect(fieldLocator, `Form field "${name}"`).toBeVisible({ timeout: 20000 });

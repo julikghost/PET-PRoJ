@@ -16,7 +16,9 @@ export async function openPetStubLoginPage (page: Page, baseUrl: string): Promis
     const loginForm = page.getByTestId('pet-login-form');
 
     await page.context().clearCookies();
-    await page.addInitScript(() => {
+    /** Do not use `addInitScript` to clear `pet-auth` — it runs on every full navigation and logs the user out after login. */
+    await page.goto('about:blank');
+    await page.evaluate(() => {
         try {
             localStorage.removeItem('pet-auth');
         } catch {

@@ -59,10 +59,11 @@ export class Booking {
     ): Promise<void> {
         await field.locator('.ant-select-selector').click({ force: true });
         const search = field
-            .locator('input[type="search"]')
+            .getByRole('combobox')
+            .or(field.locator('input[type="search"]'))
             .or(field.locator('.ant-select-selection-search-input'))
             .first();
-        await expect(search).toBeVisible({ timeout: 5000 });
+        await expect(search).toBeVisible({ timeout: 10000 });
         await search.fill(optionName);
         const dropdown = this.selectDropdownWithOption(optionName);
         await expect(dropdown).toBeVisible({ timeout: 15000 });
