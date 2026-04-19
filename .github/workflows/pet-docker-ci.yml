@@ -167,6 +167,18 @@ jobs:
         if: always()
         run: bash .github/scripts/ci/compose-e2e.sh down -v
 
+      - name: Upload session prep failure artifacts (JUnit, traces, Allure)
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-session-prep-failure
+          path: |
+            results.xml
+            test-results
+            allure-results
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Upload Playwright storage state
         uses: actions/upload-artifact@v7
         with:

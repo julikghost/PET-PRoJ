@@ -51,6 +51,16 @@ function localPetStubWebServer ():
 
 const petStubWebServer = localPetStubWebServer();
 
+/** Compose `e2e` service should set `shm_size` (see docker-compose.e2e.yml); this flag avoids tiny /dev/shm crashes. */
+const dockerChromiumUse =
+    process.env.E2E_DOCKER === '1'
+        ? {
+              launchOptions: {
+                  args: ['--disable-dev-shm-usage'],
+              },
+          }
+        : {};
+
 const defaultOptions = {
     browserName: 'chromium' as const,
     bypassCSP: true,
@@ -59,6 +69,7 @@ const defaultOptions = {
     ignoreHTTPSErrors: true,
     screenshot: 'only-on-failure' as const,
     trace: 'retain-on-failure' as const,
+    ...dockerChromiumUse,
 };
 
 /** One line per test in stdout (used by `docker-compose.e2e.yml`). JUnit + Allure stay enabled. */

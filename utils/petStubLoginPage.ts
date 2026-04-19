@@ -32,9 +32,14 @@ async function waitForPetLoginFormInDom (page: Page, openedAs: string, timeoutMs
         } catch {
             rootHint = ' #root missing or unreadable';
         }
+        const dockerHint =
+            process.env.E2E_DOCKER === '1'
+                ? ' In Docker, empty #root is often too-small /dev/shm for Chromium — ensure compose `e2e` has `shm_size` (see docker-compose.e2e.yml).'
+                : '';
         throw new Error(
             `PET stub: login form never appeared in DOM (${timeoutMs}ms). Opened: ${openedAs} — now: ${url}.${rootHint} `
             + 'Check LOGISTICS_BASE_CLIENT_URL, rebuild the pet-app image if assets 404, and inspect the trace Network tab for /assets/*.js.'
+            + dockerHint
         );
     }
 }

@@ -44,6 +44,8 @@ services:
   e2e:
     image: mcr.microsoft.com/playwright:v1.57.0-noble
     user: root
+    # Default Docker /dev/shm (64MB) is too small for headless Chromium + Vite bundle; #root stays empty without this.
+    shm_size: '2gb'
     depends_on:
       pet-app:
         condition: service_healthy

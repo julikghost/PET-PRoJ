@@ -82,6 +82,7 @@ services:
   e2e:
     image: mcr.microsoft.com/playwright:v1.57.0-noble
     user: root
+    shm_size: '2gb'
     depends_on:
       db:
         condition: service_healthy
