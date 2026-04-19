@@ -40,6 +40,8 @@ export type BookingRecord = {
     refCode: string;
     petShipId: string;
     date: string;
+    clientFirstName: string;
+    clientLastName: string;
     /** Species from the booking catalog (`bookingPets.ts`), English labels, alphabetical in UI. */
     petLabels: string[];
     weightKg: number;
@@ -65,15 +67,24 @@ export type DogDaycareRecord = {
     refCode: string;
     /** Internal booking reference specific to Dog Daycare feature. */
     bookingRefCode: string;
-    /** Booking date in YYYY-MM-DD format for daycare planning. */
-    bookingDate: string;
+    /** Start date in YYYY-MM-DD format. */
+    startDate: string;
+    /** End date in YYYY-MM-DD format. */
+    endDate: string;
+    clientFirstName: string;
+    clientLastName: string;
     dogName: string;
-    dogWeightKg: number;
-    /** Requested daycare duration in hours, clamped to 1..12. */
-    hours: number;
+    breed: string;
+    /** Age split in years and months. Combined validation: 5 months .. 12 years. */
+    ageYears: number;
+    ageMonths: number;
+    /** Requested hours per day. Allowed values: 2, 4, 6, 8, 12. */
+    hoursPerDay: number;
     status: DogDaycareStatus;
     /** Optional assignment to an existing pet seater. */
     petSeaterId?: string;
+    /** Optional uploaded pet photo (data URL/base64). */
+    petPhotoUrl?: string;
     /** Snapshot of selected pet seater name (empty when unassigned). */
     petSeaterName: string;
     notes: string;

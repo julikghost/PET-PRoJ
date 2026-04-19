@@ -29,8 +29,17 @@ Main application modules:
 - Pet Shipping
 - Booking
 - Dog Daycare (separate page and flow)
+- Pet Seaters
+- Our Clients (aggregated from Booking + Dog Daycare)
+- Europe Shows (external event links with previews)
 - Pet Movers
 - Reports (with GraphQL payload checks)
+
+Recent business rules:
+
+- `Booking` requires client first/last name.
+- `Dog Daycare` also stores client first/last name.
+- `Our Clients` table aggregates all orders per client across booking/daycare flows.
 
 Core automation practices:
 

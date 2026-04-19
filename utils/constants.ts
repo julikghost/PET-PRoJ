@@ -36,4 +36,12 @@ export const MENU_ITEM = {
         name: menu.points,
         route: 'points',
     },
+    OUR_CLIENTS: {
+        name: menu.ourClients,
+        route: 'our-clients',
+    },
+    EUROPE_SHOWS: {
+        name: menu.europeShows,
+        route: 'europe-shows',
+    },
 };

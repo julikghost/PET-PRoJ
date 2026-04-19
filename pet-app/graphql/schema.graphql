@@ -2,7 +2,7 @@
 PET logistics — GraphQL contract aligned with the PET UI data model (`src/types/petLogistics.ts`).
 
 - **Points → pet ships → bookings** live in `localStorage` key `pet-logistics-v1` (demo).
-- **Dog daycare** keeps an internal daycare booking (`bookingRefCode`, `bookingDate`) and does not depend on Booking records.
+- **Dog daycare** keeps an internal daycare booking (`bookingRefCode`, `startDate`, `endDate`) and does not depend on Booking records.
 - **Pet seaters** are stored in the same key and can be optionally assigned to daycare rows.
 - **Pet movers** directory uses `pet-movers-v1` (name, code, active, tariff `currency`, optional `cars` / `drivers` text; no region).
 - Pet ship **currency** matches the selected Pet Mover; **cars** / **drivers** are copied from that mover when the ship is saved (snapshot on the ship).
@@ -118,6 +118,8 @@ type PetBooking {
   refCode: String!
   petShip: PetShip!
   date: String!
+  clientFirstName: String!
+  clientLastName: String!
   """Species labels (English), from booking catalog."""
   petLabels: [String!]!
   weightKg: Float!
@@ -140,13 +142,20 @@ type DogDaycare {
   refCode: String!
   """Internal daycare booking reference (independent from Booking module)."""
   bookingRefCode: String!
-  bookingDate: String!
+  startDate: String!
+  endDate: String!
+  clientFirstName: String!
+  clientLastName: String!
   dogName: String!
-  dogWeightKg: Float!
-  hours: Int!
+  breed: String!
+  ageYears: Int!
+  ageMonths: Int!
+  hoursPerDay: Int!
   status: DogDaycareStatus!
   """Optional relation to pet sitter directory."""
   petSeater: PetSeater
+  """Optional uploaded pet photo (base64 data URL)."""
+  petPhotoUrl: String
   """Snapshot for table rendering; empty string when unassigned."""
   petSeaterName: String!
   notes: String!
@@ -217,6 +226,8 @@ input PetBookingInput {
   refCode: String!
   petShipId: ID!
   date: String!
+  clientFirstName: String!
+  clientLastName: String!
   petLabels: [String!]!
   weightKg: Float!
   paymentMethod: BookingPaymentMethod!
@@ -232,13 +243,20 @@ input PetSeaterInput {
 input DogDaycareInput {
   refCode: String!
   bookingRefCode: String!
-  bookingDate: String!
+  startDate: String!
+  endDate: String!
+  clientFirstName: String!
+  clientLastName: String!
   dogName: String!
-  dogWeightKg: Float!
-  hours: Int!
+  breed: String!
+  ageYears: Int!
+  ageMonths: Int!
+  hoursPerDay: Int!
   status: DogDaycareStatus!
   """Optional assignment."""
   petSeaterId: ID
+  """Optional uploaded pet photo (base64 data URL)."""
+  petPhotoUrl: String
   notes: String
   currency: TariffCurrency!
 }
