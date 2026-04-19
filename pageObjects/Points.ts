@@ -25,9 +25,11 @@ export class Points {
 
     /** Prefer over a bare visible dropdown: city and kind portals can overlap during leave/enter animation (strict mode / wrong target). */
     private selectDropdownWithOption (optionName: string): Locator {
-        return this.visibleSelectDropdown().filter({
-            has: this.page.getByRole('option', { name: optionName, exact: true }),
-        });
+        return this.visibleSelectDropdown()
+            .filter({
+                has: this.page.getByRole('option', { name: optionName, exact: true }),
+            })
+            .last();
     }
 
     /** Wait until the open city dropdown portal is gone — avoids Kind click hitting an animating overlay / `ant-modal-wrap` interception. */

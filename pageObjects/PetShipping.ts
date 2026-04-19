@@ -56,9 +56,12 @@ export class PetShipping {
         const search = field.locator('input[type="search"]').or(field.locator('.ant-select-selection-search-input'));
         await expect(search).toBeVisible({ timeout: 5000 });
         await search.fill(optionText);
-        const dropdown = this.visibleSelectDropdown().filter({
-            has: this.page.getByText(optionText, { exact: true }),
-        });
+        // Leave/enter animation can leave two visible portals with the same filtered options; `.last()` is the active layer.
+        const dropdown = this.visibleSelectDropdown()
+            .filter({
+                has: this.page.getByText(optionText, { exact: true }),
+            })
+            .last();
         await expect(dropdown).toBeVisible({ timeout: 15000 });
         await dropdown.getByRole('option', { name: optionText, exact: true }).waitFor({ state: 'attached', timeout: 15000 });
         await search.press('Enter');

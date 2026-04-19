@@ -24,14 +24,18 @@ export class Booking {
 
     private selectDropdownWithOption (optionName: string, exact = true): Locator {
         if (exact) {
-            return this.visibleSelectDropdown().filter({
-                has: this.page.getByRole('option', { name: optionName, exact: true }),
-            });
+            return this.visibleSelectDropdown()
+                .filter({
+                    has: this.page.getByRole('option', { name: optionName, exact: true }),
+                })
+                .last();
         }
 
-        return this.visibleSelectDropdown().filter({
-            has: this.page.locator('.ant-select-item-option-content').filter({ hasText: optionName }),
-        });
+        return this.visibleSelectDropdown()
+            .filter({
+                has: this.page.locator('.ant-select-item-option-content').filter({ hasText: optionName }),
+            })
+            .last();
     }
 
     private async selectOptionByClick (
