@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '@playwright/test';
 import { config } from '../../config-logistics';
-import { MENU_ITEM } from '../../utils/constants';
+import { MENU_ITEM, REPORTS_DATA_TESTID } from '../../utils/constants';
 import { LogisticsApp } from '../../pageObjects/LogisticsApp';
 import type { EmailSendCapture } from '../../pageObjects/Reports';
 import { reports } from '../../utils/text';
@@ -86,7 +86,11 @@ test.describe('Reports', () => {
             const base = config.baseUrl.trim().replace(/\/?$/, '');
             await page.goto(`${base}/reports`, { waitUntil: 'domcontentloaded' });
 
-            await app.reports.field.selectOptions({ name: reports.petMover, options: petMoverUi.label });
+            await app.reports.field.selectOptions({
+                name: reports.petMover,
+                options: petMoverUi.label,
+                testId: REPORTS_DATA_TESTID.petMoverSelect,
+            });
             await app.reports.field.fillDateRange({ name: reports.dateRange, startDate, endDate });
             await app.reports.field.selectOptions({ name: reports.paymentType, options: uiPaymentMethods });
             await app.reports.field.selectOptions({ name: reports.currency, options: uiCurrencies });

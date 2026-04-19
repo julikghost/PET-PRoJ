@@ -17,7 +17,7 @@ jobs:
     outputs:
       include: ${{ steps.set.outputs.include }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - id: set
         name: Discover specs (tests/logistics/*.spec.ts)
@@ -27,9 +27,17 @@ jobs:
             echo '::error::tests/logistics not found'
             exit 1
           fi
-          node <<'NODE' > /tmp/e2e-matrix-include.json
+          node <<'NODE'
+          const crypto = require('crypto');
           const fs = require('fs');
           const path = require('path');
+
+          const outPath = process.env.GITHUB_OUTPUT;
+          if (!outPath) {
+            console.error('GITHUB_OUTPUT is not set');
+            process.exit(1);
+          }
+
           const dir = path.join(process.cwd(), 'tests', 'logistics');
           const include = fs
             .readdirSync(dir)
@@ -39,17 +47,16 @@ jobs:
               name: f.replace(/\.spec\.ts$/, ''),
               spec: path.posix.join('tests', 'logistics', f),
             }));
+
           if (include.length === 0) {
             console.error('No tests/logistics/*.spec.ts files');
             process.exit(1);
           }
-          process.stdout.write(JSON.stringify(include));
+
+          const json = JSON.stringify(include);
+          const delim = `MATRIX_${crypto.randomBytes(16).toString('hex')}`;
+          fs.appendFileSync(outPath, `include<<${delim}\n${json}\n${delim}\n`);
           NODE
-          {
-            echo 'include<<JSON_EOF'
-            cat /tmp/e2e-matrix-include.json
-            echo JSON_EOF
-          } >> "$GITHUB_OUTPUT"
 
   e2e-docker:
     needs: e2e-matrix-prep
@@ -64,7 +71,7 @@ jobs:
     name: E2E Docker / ${{ matrix.name }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build PET UI (pet-app) image
         run: docker compose -f docker-compose.e2e.yml build pet-app
@@ -85,7 +92,7 @@ jobs:
       - name: Upload Playwright report and JUnit
         if: failure()
         id: upload-e2e
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-docker-${{ matrix.name }}
           path: |

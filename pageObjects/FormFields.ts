@@ -56,51 +56,65 @@ export class FormFields {
     }
 
 
-    async selectOptions ({ name, options }: { name: string; options: string | string[] }) {
+    async selectOptions ({
+        name,
+        options,
+        testId,
+    }: {
+        name: string;
+        options: string | string[];
+        /** When set, must match Ant `Select` root `data-testid` (avoids label/`input` drift, e.g. Reports PetMover). */
+        testId?: string;
+    }) {
         await test.step(`Select option(s) in the '${name}' field`, async () => {
-            const fieldLocator = this.fieldsLocator.filter({ has: this.page.getByText(name, { exact: true }) });
             const optionsArray = Array.isArray(options) ? options : [options];
-            const inputLocator = fieldLocator.locator('input');
 
-            await inputLocator.scrollIntoViewIfNeeded();
-            const isReadonly = await inputLocator.getAttribute('readonly');
-            const isDisabled = await inputLocator.isDisabled();
+            let selectTrigger: Locator;
 
-            if (isReadonly !== null || isDisabled) {
-                const selectLocator = fieldLocator.locator('.ant-select').first();
-                await selectLocator.scrollIntoViewIfNeeded();
-                try {
-                    await selectLocator.click({ force: true });
-                } catch {
-                    await selectLocator.evaluate((el: Element) => (el as HTMLElement).click());
-                }
+            if (testId?.trim()) {
+                selectTrigger = this.page.getByTestId(testId.trim());
+                await expect(selectTrigger, `Select [data-testid="${testId}"]`).toBeVisible({
+                    timeout: 20000,
+                });
             } else {
-                await inputLocator.scrollIntoViewIfNeeded();
-                try {
-                    await inputLocator.click({ force: true });
-                } catch {
-                    await inputLocator.evaluate((el: Element) => (el as HTMLElement).click());
-                }
+                const fieldLocator = this.fieldsLocator.filter({ hasText: name }).first();
+                await expect(fieldLocator, `Form field "${name}"`).toBeVisible({ timeout: 20000 });
+                /** Open by clicking the Select shell — reliable for Ant Design 5 (no dependency on inner `input`). */
+                selectTrigger = fieldLocator.locator('.ant-select').first();
+                await expect(selectTrigger, `Ant Select for "${name}"`).toBeVisible({ timeout: 15000 });
             }
 
+            await selectTrigger.scrollIntoViewIfNeeded();
+            await selectTrigger.click({ force: true });
+
             const dropdown = this.page.locator('.ant-select-dropdown:visible').last();
-            await dropdown.waitFor({ state: 'visible', timeout: 10000 });
+            await dropdown.waitFor({ state: 'visible', timeout: 15000 });
 
             for (const option of optionsArray) {
-                const optionLocator = dropdown.locator('.ant-select-item-option-content').filter({ hasText: option }).first();
-                await optionLocator.waitFor({ state: 'visible', timeout: 10000 });
+                const optionLocator = dropdown
+                    .locator('.ant-select-item-option-content')
+                    .filter({ hasText: option })
+                    .first();
+                await optionLocator.waitFor({ state: 'visible', timeout: 15000 });
                 await optionLocator.click();
             }
 
             if (optionsArray.length > 1) {
                 await this.page.keyboard.press('Escape');
+            } else if (!testId?.trim()) {
+                await this.fieldsLocator
+                    .filter({ hasText: name })
+                    .first()
+                    .locator('.ant-form-item-label')
+                    .first()
+                    .click()
+                    .catch(() => {});
             } else {
-                await fieldLocator.locator('.ant-form-item-label').first().click().catch(() => {});
+                await this.page.keyboard.press('Escape').catch(() => {});
             }
             await this.page.waitForTimeout(300);
 
-            const selectContainer = fieldLocator.first().locator('.ant-select').first();
-            await expect(selectContainer).toContainText(optionsArray[0], { timeout: 3000 });
+            await expect(selectTrigger).toContainText(optionsArray[0], { timeout: 8000 });
         });
     }
 

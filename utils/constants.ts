@@ -37,3 +37,9 @@ export const MENU_ITEM = {
         route: 'points',
     },
 };
+
+/** Matches `pet-app` ReportsPage `data-testid` — stable anchors for FormFields / E2E. */
+export const REPORTS_DATA_TESTID = {
+    petMoverSelect: 'pet-reports-pet-mover',
+    sendReportToEmail: 'pet-reports-send-to-email',
+} as const;
