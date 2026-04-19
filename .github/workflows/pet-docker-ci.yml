@@ -40,7 +40,7 @@ jobs:
           echo "PET_APP_IMAGE_PREFIX=ghcr.io/${REPO_LC}/pet-app" >> "$GITHUB_ENV"
           echo "image=ghcr.io/${REPO_LC}/pet-app:${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -126,7 +126,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -192,7 +192,7 @@ jobs:
           name: e2e-storage-state
           path: .
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
