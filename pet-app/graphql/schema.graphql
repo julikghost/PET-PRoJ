@@ -2,6 +2,8 @@
 PET logistics — GraphQL contract aligned with the PET UI data model (`src/types/petLogistics.ts`).
 
 - **Points → pet ships → bookings** live in `localStorage` key `pet-logistics-v1` (demo).
+- **Dog daycare** keeps an internal daycare booking (`bookingRefCode`, `bookingDate`) and does not depend on Booking records.
+- **Pet seaters** are stored in the same key and can be optionally assigned to daycare rows.
 - **Pet movers** directory uses `pet-movers-v1` (name, code, active, tariff `currency`, optional `cars` / `drivers` text; no region).
 - Pet ship **currency** matches the selected Pet Mover; **cars** / **drivers** are copied from that mover when the ship is saved (snapshot on the ship).
 - Booking **petLabels** are **species** names (English catalog), not pet names.
@@ -46,6 +48,17 @@ enum NetworkPointKind {
   AIRPORT
 }
 
+"""
+UI values: `scheduled`, `checked-in`, `active`, `checked-out`.
+Enum maps kebab-case values to GraphQL-safe names.
+"""
+enum DogDaycareStatus {
+  SCHEDULED
+  CHECKED_IN
+  ACTIVE
+  CHECKED_OUT
+}
+
 # --- Read models ---
 
 type Query {
@@ -55,9 +68,13 @@ type Query {
   petMovers: [PetMover!]!
   petShips: [PetShip!]!
   bookings: [PetBooking!]!
+  dogDaycares: [DogDaycare!]!
+  petSeaters: [PetSeater!]!
   petShip(id: ID!): PetShip
   networkPoint(id: ID!): NetworkPoint
   petMover(id: ID!): PetMover
+  dogDaycare(id: ID!): DogDaycare
+  petSeater(id: ID!): PetSeater
 }
 
 type NetworkPoint {
@@ -110,6 +127,33 @@ type PetBooking {
   billingCurrency: BillingCurrency!
 }
 
+type PetSeater {
+  id: ID!
+  code: String!
+  name: String!
+  phone: String!
+  active: Boolean!
+}
+
+type DogDaycare {
+  id: ID!
+  refCode: String!
+  """Internal daycare booking reference (independent from Booking module)."""
+  bookingRefCode: String!
+  bookingDate: String!
+  dogName: String!
+  dogWeightKg: Float!
+  hours: Int!
+  status: DogDaycareStatus!
+  """Optional relation to pet sitter directory."""
+  petSeater: PetSeater
+  """Snapshot for table rendering; empty string when unassigned."""
+  petSeaterName: String!
+  notes: String!
+  price: Float!
+  currency: TariffCurrency!
+}
+
 # --- Writes (intended backend shape) ---
 
 type Mutation {
@@ -130,6 +174,14 @@ type Mutation {
   createPetBooking(input: PetBookingInput!): PetBookingMutationPayload!
   updatePetBooking(id: ID!, input: PetBookingInput!): PetBookingMutationPayload!
   deletePetBooking(id: ID!): PetBookingMutationPayload!
+
+  createPetSeater(input: PetSeaterInput!): PetSeaterMutationPayload!
+  updatePetSeater(id: ID!, input: PetSeaterInput!): PetSeaterMutationPayload!
+  deletePetSeater(id: ID!): PetSeaterMutationPayload!
+
+  createDogDaycare(input: DogDaycareInput!): DogDaycareMutationPayload!
+  updateDogDaycare(id: ID!, input: DogDaycareInput!): DogDaycareMutationPayload!
+  deleteDogDaycare(id: ID!): DogDaycareMutationPayload!
 }
 
 input NetworkPointInput {
@@ -170,6 +222,27 @@ input PetBookingInput {
   paymentMethod: BookingPaymentMethod!
 }
 
+input PetSeaterInput {
+  code: String!
+  name: String!
+  phone: String
+  active: Boolean!
+}
+
+input DogDaycareInput {
+  refCode: String!
+  bookingRefCode: String!
+  bookingDate: String!
+  dogName: String!
+  dogWeightKg: Float!
+  hours: Int!
+  status: DogDaycareStatus!
+  """Optional assignment."""
+  petSeaterId: ID
+  notes: String
+  currency: TariffCurrency!
+}
+
 type NetworkPointMutationPayload {
   ok: Boolean!
   point: NetworkPoint
@@ -191,6 +264,18 @@ type PetShipMutationPayload {
 type PetBookingMutationPayload {
   ok: Boolean!
   booking: PetBooking
+  error: String
+}
+
+type PetSeaterMutationPayload {
+  ok: Boolean!
+  petSeater: PetSeater
+  error: String
+}
+
+type DogDaycareMutationPayload {
+  ok: Boolean!
+  dogDaycare: DogDaycare
   error: String
 }
 
