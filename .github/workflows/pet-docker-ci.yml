@@ -208,7 +208,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: e2e-storage-state
           path: .
