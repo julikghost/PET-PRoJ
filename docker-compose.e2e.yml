@@ -1,10 +1,20 @@
 # PET UI + Playwright E2E in Docker (CI / local parity). From repo root:
 #   docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
+#
+# Compose reads the repo-root `.env` for ${VAR:-default} substitution (same names as local E2E).
+# Inside the stack, URLs must target `pet-app`, not `localhost`. Build args align the UI bundle with those creds.
 services:
   pet-app:
     build:
       context: ./pet-app
       dockerfile: Dockerfile
+      args:
+        VITE_PET_USER: ${LOGISTICS_UI_USER_NAME:-pet@example.com}
+        VITE_PET_PASSWORD: ${LOGISTICS_PASSWORD:-pet-secret}
+        VITE_PET_ADMIN_USER: ${LOGISTICS_ADMIN_USER_NAME:-pet-admin@example.com}
+        VITE_PET_ADMIN_PASSWORD: ${LOGISTICS_ADMIN_PASSWORD:-pet-admin-secret}
+        VITE_PET_ACCOUNTANT_USER: ${LOGISTICS_ACCOUNTANT_USER_NAME:-pet-accountant@example.com}
+        VITE_PET_ACCOUNTANT_PASSWORD: ${LOGISTICS_ACCOUNTANT_PASSWORD:-pet-accountant-secret}
     expose:
       - "5173"
     healthcheck:
@@ -32,14 +42,14 @@ services:
     environment:
       LOGISTICS_BASE_CLIENT_URL: http://pet-app:5173/
       LOGISTICS_BASE_API_URL: http://pet-app:5173/api
-      LOGISTICS_UI_USER_NAME: pet@example.com
-      LOGISTICS_PASSWORD: pet-secret
-      LOGISTICS_ADMIN_USER_NAME: pet-admin@example.com
-      LOGISTICS_ADMIN_PASSWORD: pet-admin-secret
-      LOGISTICS_ACCOUNTANT_USER_NAME: pet-accountant@example.com
-      LOGISTICS_ACCOUNTANT_PASSWORD: pet-accountant-secret
-      E2E_LOGIN_USER_FIELD_NAME: identifier
-      E2E_TIME_ZONE: UTC
+      LOGISTICS_UI_USER_NAME: ${LOGISTICS_UI_USER_NAME:-pet@example.com}
+      LOGISTICS_PASSWORD: ${LOGISTICS_PASSWORD:-pet-secret}
+      LOGISTICS_ADMIN_USER_NAME: ${LOGISTICS_ADMIN_USER_NAME:-pet-admin@example.com}
+      LOGISTICS_ADMIN_PASSWORD: ${LOGISTICS_ADMIN_PASSWORD:-pet-admin-secret}
+      LOGISTICS_ACCOUNTANT_USER_NAME: ${LOGISTICS_ACCOUNTANT_USER_NAME:-pet-accountant@example.com}
+      LOGISTICS_ACCOUNTANT_PASSWORD: ${LOGISTICS_ACCOUNTANT_PASSWORD:-pet-accountant-secret}
+      E2E_LOGIN_USER_FIELD_NAME: ${E2E_LOGIN_USER_FIELD_NAME:-identifier}
+      E2E_TIME_ZONE: ${E2E_TIME_ZONE:-UTC}
       E2E_PET_STUB_LOGIN: "1"
       E2E_DOCKER: "1"
       CI: "true"
