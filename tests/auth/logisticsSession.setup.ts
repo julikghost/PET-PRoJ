@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { test as setup, expect } from '@playwright/test';
 import { config, storageStatePath } from '../../config-logistics';
-import { getAccessToken } from '../../utils/helper';
+import { assertPetStorageStateHasPetAuth, getAccessToken } from '../../utils/helper';
 import { openPetStubLoginPage } from '../../utils/petStubLoginPage';
 import { usePetStubLoginFlow } from '../../utils/petStubLoginFlow';
 import { LogisticsApp } from '../../pageObjects/LogisticsApp';
@@ -52,8 +52,21 @@ setup('Persist logistics web session storage', async ({ page }) => {
 
     await expect(page).toHaveURL(postLoginClientUrlRegex(baseUrl));
 
+    /** PET auth lives in `localStorage`; ensure it exists before `storageState()` or the file can be empty origins. */
+    await page.waitForFunction(
+        () => {
+            try {
+                return Boolean(localStorage.getItem('pet-auth'));
+            } catch {
+                return false;
+            }
+        },
+        { timeout: 20_000 }
+    );
+
     fs.mkdirSync(path.dirname(storageStatePath), { recursive: true });
     await page.context().storageState({ path: storageStatePath });
+    assertPetStorageStateHasPetAuth(storageStatePath);
 
     const accessToken = await getAccessToken(storageStatePath);
     process.env.E2E_SESSION_ACCESS_TOKEN = accessToken;
