@@ -6,10 +6,50 @@
  * CI (Docker): headless Chromium; матрица GitHub — один job на `tests/logistics/*.spec.ts`.
  */
 
+import path from 'node:path';
 import { defineConfig } from '@playwright/test';
 import { config, storageStatePath } from './config-logistics';
+import { usePetStubLoginFlow } from './utils/petStubLoginFlow';
 
 const { baseUrl } = config;
+
+/**
+ * Local runs: start Vite for `pet-app` when tests target loopback and PET stub login is active.
+ * Docker CI sets `E2E_DOCKER=1` (no webServer — `pet-app` is a separate compose service).
+ * To run the UI yourself on the same port: `E2E_SKIP_WEB_SERVER=1`.
+ */
+function localPetStubWebServer ():
+    | {
+          command: string;
+          cwd: string;
+          url: string;
+          reuseExistingServer: boolean;
+          timeout: number;
+      }
+    | undefined {
+    if (process.env.E2E_SKIP_WEB_SERVER === '1' || process.env.E2E_DOCKER === '1') {
+        return undefined;
+    }
+    const u = baseUrl.trim().toLowerCase();
+    if (!u || (!u.includes('localhost') && !u.includes('127.0.0.1'))) {
+        return undefined;
+    }
+    if (!usePetStubLoginFlow()) {
+        return undefined;
+    }
+    const origin = baseUrl.trim().replace(/\/+$/, '');
+
+    /** Run Vite from `pet-app/` so `node_modules/.bin` is on PATH (Windows rejects root `npm run pet:dev` without deps). */
+    return {
+        command: 'npm run dev',
+        cwd: path.join(process.cwd(), 'pet-app'),
+        url: `${origin}/login`,
+        reuseExistingServer: process.env.CI !== 'true',
+        timeout: 120_000,
+    };
+}
+
+const petStubWebServer = localPetStubWebServer();
 
 const defaultOptions = {
     browserName: 'chromium' as const,
@@ -36,6 +76,15 @@ const reporters =
 
 export default defineConfig({
     timeout: 80000,
+    ...(petStubWebServer
+        ? {
+              webServer: {
+                  ...petStubWebServer,
+                  stdout: 'pipe',
+                  stderr: 'pipe',
+              },
+          }
+        : {}),
     use: {
         actionTimeout: 40000,
     },

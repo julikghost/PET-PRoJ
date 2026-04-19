@@ -3,6 +3,8 @@
 # From repo root:
 #   docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
 #
+# Postgres + API gate + UI + E2E (порядок готовности: БД → бэк → фронт → тесты): `docker-compose.stack.yml` или `npm run docker:e2e:stack`.
+#
 # Один файл (опционально): E2E_PLAYWRIGHT_SPEC=tests/logistics/booking.spec.ts docker compose … up …
 #
 # Compose reads the repo-root `.env` for ${VAR:-default} substitution (same names as local E2E).

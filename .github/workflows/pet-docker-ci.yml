@@ -3,6 +3,10 @@
 # 2) discover tests/logistics/*.spec.ts
 # 3) prep: Chromium — role smoke + logistics_session → storageState/session.json
 # 4) матрица: один job на файл спека; `--no-deps`, headless Chromium
+#
+# Compose: по умолчанию `.github/scripts/ci/compose-e2e.sh` → docker-compose.e2e.yml (PET UI + Playwright, без Postgres).
+# Полный стек (БД + заглушка api + UI + e2e): docker-compose.stack.yml — в job задайте env E2E_COMPOSE_STACK=1
+# (тот же compose-e2e.sh). После появления реального бэка правьте сервис `api` и LOGISTICS_BASE_API_URL у `e2e` в stack-файле.
 
 name: PET Docker CI
 
