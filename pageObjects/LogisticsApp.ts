@@ -15,6 +15,9 @@ import { Booking } from './Booking';
 import { Points } from './Points';
 import { NavigationSidebar } from './NavigationSidebar';
 
+/** Docker runners are slower; PET stub navigation after submit needs more slack than local dev. */
+const PET_POST_LOGIN_ASSERT_MS = process.env.E2E_DOCKER === '1' ? 45_000 : 20_000;
+
 export class LogisticsApp {
     readonly page: Page;
     readonly login: Login;
@@ -68,7 +71,7 @@ export class LogisticsApp {
             }
             await openPetStubLoginPage(this.page, config.baseUrl);
             await this.login.signInPetApp(adminUsername, adminPassword);
-            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: 20000 });
+            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: PET_POST_LOGIN_ASSERT_MS });
         });
     }
 
@@ -85,7 +88,7 @@ export class LogisticsApp {
             }
             await openPetStubLoginPage(this.page, config.baseUrl);
             await this.login.signInPetApp(uiUsername, password);
-            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: 20000 });
+            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: PET_POST_LOGIN_ASSERT_MS });
         });
     }
 
@@ -206,7 +209,7 @@ export class LogisticsApp {
             }
             await openPetStubLoginPage(this.page, config.baseUrl);
             await this.login.signInPetApp(accountantUsername, accountantPassword);
-            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: 20000 });
+            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: PET_POST_LOGIN_ASSERT_MS });
         });
     }
 

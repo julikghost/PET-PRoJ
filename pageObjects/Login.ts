@@ -63,7 +63,11 @@ export class Login {
 
             const submitBtn = pwForm.getByTestId('pet-login-submit');
             await expect(submitBtn).toBeVisible();
-            await submitBtn.click();
+            const postLoginMs = process.env.E2E_DOCKER === '1' ? 45_000 : 28_000;
+            await Promise.all([
+                this.page.waitForURL(/\/(home|reports)(\/|$|\?)/, { timeout: postLoginMs }),
+                submitBtn.click(),
+            ]);
         });
     }
 

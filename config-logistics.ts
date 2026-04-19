@@ -14,7 +14,8 @@ function loadEnvFromRepoRoot (): void {
     ];
     for (const p of candidates) {
         if (fs.existsSync(p)) {
-            dotenv.config({ path: p });
+            // `override: false`: Compose / CI already set `LOGISTICS_*` etc.; mounted `.env` must not overwrite them.
+            dotenv.config({ path: p, override: false });
         }
     }
 }
