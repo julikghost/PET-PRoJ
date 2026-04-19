@@ -12,11 +12,18 @@ import type {
     BookingBillingCurrency,
     BookingPaymentMethod,
     BookingRecord,
+    DogDaycareRecord,
+    DogDaycareStatus,
+    PetSeaterRecord,
     PetShipCurrency,
     PetShipRecord,
     PointRecord,
 } from '../types/petLogistics';
-import { computeBookingPrice } from '../utils/pricing';
+import {
+    computeBookingPrice,
+    computeDogDaycarePrice,
+    normalizeDogDaycareHours,
+} from '../utils/pricing';
 
 export const PET_LOGISTICS_STORAGE_KEY = 'pet-logistics-v1';
 
@@ -24,12 +31,23 @@ type StoreState = {
     points: PointRecord[];
     petShips: PetShipRecord[];
     bookings: BookingRecord[];
+    dogDaycares: DogDaycareRecord[];
+    petSeaters: PetSeaterRecord[];
 };
+
+const DOG_DAYCARE_STATUSES: readonly DogDaycareStatus[] = [
+    'scheduled',
+    'checked-in',
+    'active',
+    'checked-out',
+];
 
 const emptyState = (): StoreState => ({
     points: [],
     petShips: [],
     bookings: [],
+    dogDaycares: [],
+    petSeaters: [],
 });
 
 function normalizePetShip (raw: unknown): PetShipRecord | null {
@@ -87,6 +105,14 @@ function parseStoredPetLabels (b: Record<string, unknown>): string[] | null {
     return null;
 }
 
+function normalizeDogDaycareStatus (raw: unknown): DogDaycareStatus {
+    if (typeof raw === 'string' && DOG_DAYCARE_STATUSES.includes(raw as DogDaycareStatus)) {
+        return raw as DogDaycareStatus;
+    }
+
+    return 'scheduled';
+}
+
 function normalizeBooking (raw: unknown, petShips: PetShipRecord[]): BookingRecord | null {
     if (raw === null || typeof raw !== 'object') {
         return null;
@@ -106,14 +132,11 @@ function normalizeBooking (raw: unknown, petShips: PetShipRecord[]): BookingReco
     const ship = petShips.find((x) => x.id === b.petShipId);
     const currency: PetShipCurrency =
         b.currency === 'USD' || b.currency === 'EUR' ? b.currency : ship?.currency ?? 'EUR';
-    let price = typeof b.price === 'number' && !Number.isNaN(b.price) ? b.price : NaN;
-    if (Number.isNaN(price) && ship) {
-        price = computeBookingPrice(b.weightKg, ship.currency, ship.departure, ship.arrival);
-    }
-    if (Number.isNaN(price)) {
-        price = 0;
-    }
-
+    const price = ship
+        ? computeBookingPrice(b.weightKg, ship.currency, ship.departure, ship.arrival)
+        : typeof b.price === 'number' && !Number.isNaN(b.price)
+            ? b.price
+            : 0;
     const paymentMethod: BookingPaymentMethod =
         b.paymentMethod === 'card' || b.paymentMethod === 'cash' || b.paymentMethod === 'petpay'
             ? b.paymentMethod
@@ -140,6 +163,74 @@ function normalizeBooking (raw: unknown, petShips: PetShipRecord[]): BookingReco
     };
 }
 
+function normalizePetSeater (raw: unknown): PetSeaterRecord | null {
+    if (raw === null || typeof raw !== 'object') {
+        return null;
+    }
+    const s = raw as Record<string, unknown>;
+    if (typeof s.id !== 'string' || typeof s.code !== 'string' || typeof s.name !== 'string') {
+        return null;
+    }
+
+    return {
+        id: s.id,
+        code: s.code.trim(),
+        name: s.name.trim(),
+        phone: typeof s.phone === 'string' ? s.phone.trim() : '',
+        active: s.active !== false,
+    };
+}
+
+function normalizeDogDaycare (raw: unknown, petSeaters: PetSeaterRecord[]): DogDaycareRecord | null {
+    if (raw === null || typeof raw !== 'object') {
+        return null;
+    }
+    const d = raw as Record<string, unknown>;
+    if (typeof d.id !== 'string' || typeof d.refCode !== 'string' || typeof d.hours !== 'number') {
+        return null;
+    }
+    const bookingRefCode = typeof d.bookingRefCode === 'string'
+        ? d.bookingRefCode.trim()
+        : typeof d.bookingId === 'string'
+            ? d.bookingId.trim()
+            : '';
+    const bookingDate = typeof d.bookingDate === 'string'
+        ? d.bookingDate.trim()
+        : typeof d.date === 'string'
+            ? d.date.trim()
+            : '';
+    const dogName = typeof d.dogName === 'string' && d.dogName.trim() ? d.dogName.trim() : 'Dog';
+    const dogWeightKg = typeof d.dogWeightKg === 'number' && Number.isFinite(d.dogWeightKg)
+        ? d.dogWeightKg
+        : typeof d.weightKg === 'number' && Number.isFinite(d.weightKg)
+            ? d.weightKg
+            : 10;
+    const currency: PetShipCurrency = d.currency === 'USD' ? 'USD' : 'EUR';
+    const hours = normalizeDogDaycareHours(d.hours);
+    const status = normalizeDogDaycareStatus(d.status);
+    const notes = typeof d.notes === 'string' ? d.notes.trim() : '';
+    const petSeaterId = typeof d.petSeaterId === 'string' && d.petSeaterId.trim()
+        ? d.petSeaterId.trim()
+        : undefined;
+    const petSeater = petSeaterId ? petSeaters.find((x) => x.id === petSeaterId) : undefined;
+
+    return {
+        id: d.id,
+        refCode: d.refCode.trim(),
+        bookingRefCode,
+        bookingDate,
+        dogName,
+        dogWeightKg,
+        hours,
+        status,
+        petSeaterId: petSeater?.id,
+        petSeaterName: petSeater?.name ?? '',
+        notes,
+        price: computeDogDaycarePrice(dogWeightKg, currency, hours),
+        currency,
+    };
+}
+
 function loadState (): StoreState {
     try {
         const raw = localStorage.getItem(PET_LOGISTICS_STORAGE_KEY);
@@ -154,11 +245,21 @@ function loadState (): StoreState {
         const bookings = bookingsRaw
             .map((row) => normalizeBooking(row, petShips))
             .filter((x): x is BookingRecord => x !== null);
+        const petSeatersRaw = Array.isArray(p.petSeaters) ? p.petSeaters : [];
+        const petSeaters = petSeatersRaw
+            .map((row) => normalizePetSeater(row))
+            .filter((x): x is PetSeaterRecord => x !== null);
+        const dogDaycaresRaw = Array.isArray(p.dogDaycares) ? p.dogDaycares : [];
+        const dogDaycares = dogDaycaresRaw
+            .map((row) => normalizeDogDaycare(row, petSeaters))
+            .filter((x): x is DogDaycareRecord => x !== null);
 
         return {
             points,
             petShips,
             bookings,
+            dogDaycares,
+            petSeaters,
         };
     } catch {
         return emptyState();
@@ -177,13 +278,25 @@ function newBookingId (): string {
     return `bk-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function newDogDaycareId (): string {
+    return `dc-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function newPetSeaterId (): string {
+    return `ps-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 export type PetLogisticsContextValue = {
     points: PointRecord[];
     petShips: PetShipRecord[];
     bookings: BookingRecord[];
+    dogDaycares: DogDaycareRecord[];
+    petSeaters: PetSeaterRecord[];
+    activePetSeaters: PetSeaterRecord[];
     pointOptionLabel: (p: PointRecord) => string;
     petShipOptionLabel: (ship: PetShipRecord) => string;
     petShipRouteText: (ship: PetShipRecord) => string;
+    petSeaterOptionLabel: (petSeater: PetSeaterRecord) => string;
     getPoint: (id: string) => PointRecord | undefined;
     bookablePetShips: PetShipRecord[];
     upsertPoint: (row: Omit<PointRecord, 'id'> & { id?: string }) => boolean;
@@ -194,6 +307,12 @@ export type PetLogisticsContextValue = {
         row: Omit<BookingRecord, 'id' | 'price' | 'currency' | 'billingCurrency'> & { id?: string }
     ) => boolean;
     deleteBooking: (id: string) => void;
+    upsertDogDaycare: (
+        row: Omit<DogDaycareRecord, 'id' | 'petSeaterName' | 'price'> & { id?: string }
+    ) => boolean;
+    deleteDogDaycare: (id: string) => void;
+    upsertPetSeater: (row: Omit<PetSeaterRecord, 'id'> & { id?: string }) => boolean;
+    deletePetSeater: (id: string) => boolean;
 };
 
 const PetLogisticsContext = createContext<PetLogisticsContextValue | null>(null);
@@ -229,9 +348,19 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
         [petShipRouteText]
     );
 
+    const petSeaterOptionLabel = useCallback(
+        (petSeater: PetSeaterRecord) => `${petSeater.name} (${petSeater.code})`,
+        []
+    );
+
     const bookablePetShips = useMemo(
         () => state.petShips.filter((s) => s.status === 'planned' || s.status === 'active'),
         [state.petShips]
+    );
+
+    const activePetSeaters = useMemo(
+        () => state.petSeaters.filter((x) => x.active),
+        [state.petSeaters]
     );
 
     const upsertPoint = useCallback((row: Omit<PointRecord, 'id'> & { id?: string }): boolean => {
@@ -366,13 +495,11 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
 
                     return prev;
                 }
-                const price = computeBookingPrice(row.weightKg, ship.currency, ship.departure, ship.arrival);
                 const paymentMethod: BookingPaymentMethod =
                     row.paymentMethod === 'card' || row.paymentMethod === 'cash' || row.paymentMethod === 'petpay'
                         ? row.paymentMethod
                         : 'card';
-                const billingCurrency: BookingBillingCurrency =
-                    ship.currency === 'USD' ? 'cur-usd' : 'cur-eur';
+                const billingCurrency: BookingBillingCurrency = ship.currency === 'USD' ? 'cur-usd' : 'cur-eur';
                 const petLabels = row.petLabels.map((s) => s.trim()).filter(Boolean);
                 if (petLabels.length === 0) {
                     toast.error('Select at least one species');
@@ -386,7 +513,7 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
                     date: row.date,
                     petLabels,
                     weightKg: row.weightKg,
-                    price,
+                    price: computeBookingPrice(row.weightKg, ship.currency, ship.departure, ship.arrival),
                     currency: ship.currency,
                     paymentMethod,
                     billingCurrency,
@@ -429,14 +556,173 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
         }));
     }, []);
 
+    const upsertPetSeater = useCallback((row: Omit<PetSeaterRecord, 'id'> & { id?: string }): boolean => {
+        const id = row.id ?? newPetSeaterId();
+        const full: PetSeaterRecord = {
+            id,
+            code: row.code.trim(),
+            name: row.name.trim(),
+            phone: row.phone.trim(),
+            active: row.active,
+        };
+        let accepted = false;
+        setState((prev) => {
+            if (!full.code || !full.name) {
+                toast.error('Pet seater code and name are required');
+
+                return prev;
+            }
+            const codeNorm = full.code.toLowerCase();
+            const dup = prev.petSeaters.some(
+                (s) => s.id !== full.id && s.code.trim().toLowerCase() === codeNorm
+            );
+            if (dup) {
+                toast.error('Pet seater code must be unique');
+
+                return prev;
+            }
+            accepted = true;
+            const exists = prev.petSeaters.some((s) => s.id === full.id);
+            const petSeaters = exists
+                ? prev.petSeaters.map((s) => (s.id === full.id ? full : s))
+                : [...prev.petSeaters, full];
+            const dogDaycares = prev.dogDaycares.map((d) => (
+                d.petSeaterId === full.id
+                    ? { ...d, petSeaterName: full.name }
+                    : d
+            ));
+
+            return { ...prev, petSeaters, dogDaycares };
+        });
+
+        return accepted;
+    }, []);
+
+    const deletePetSeater = useCallback((id: string): boolean => {
+        let accepted = false;
+        setState((prev) => {
+            const used = prev.dogDaycares.some((d) => d.petSeaterId === id);
+            if (used) {
+                toast.error('Cannot delete: pet seater is assigned in dog daycare');
+
+                return prev;
+            }
+            accepted = true;
+
+            return { ...prev, petSeaters: prev.petSeaters.filter((s) => s.id !== id) };
+        });
+
+        return accepted;
+    }, []);
+
+    const upsertDogDaycare = useCallback(
+        (
+            row: Omit<DogDaycareRecord, 'id' | 'petSeaterName' | 'price'> & { id?: string }
+        ): boolean => {
+            const id = row.id ?? newDogDaycareId();
+            let accepted = false;
+            setState((prev) => {
+                const refCode = row.refCode.trim();
+                if (!refCode) {
+                    toast.error('Daycare ref is required');
+
+                    return prev;
+                }
+                const refNorm = refCode.toLowerCase();
+                const dup = prev.dogDaycares.some(
+                    (d) => d.id !== id && d.refCode.trim().toLowerCase() === refNorm
+                );
+                if (dup) {
+                    toast.error('Daycare ref must be unique');
+
+                    return prev;
+                }
+                const bookingRefCode = row.bookingRefCode.trim();
+                if (!bookingRefCode) {
+                    toast.error('Daycare booking ref is required');
+
+                    return prev;
+                }
+                const bookingDate = row.bookingDate.trim();
+                if (!bookingDate) {
+                    toast.error('Daycare booking date is required');
+
+                    return prev;
+                }
+                const dogName = row.dogName.trim();
+                if (!dogName) {
+                    toast.error('Dog name is required');
+
+                    return prev;
+                }
+                const dogWeightKg = Number(row.dogWeightKg);
+                if (!Number.isFinite(dogWeightKg) || dogWeightKg <= 0) {
+                    toast.error('Dog weight must be greater than 0');
+
+                    return prev;
+                }
+                const petSeaterId = typeof row.petSeaterId === 'string' && row.petSeaterId.trim()
+                    ? row.petSeaterId.trim()
+                    : undefined;
+                const petSeater = petSeaterId
+                    ? prev.petSeaters.find((x) => x.id === petSeaterId)
+                    : undefined;
+                if (petSeaterId && !petSeater) {
+                    toast.error('Selected pet seater does not exist');
+
+                    return prev;
+                }
+                const hours = normalizeDogDaycareHours(row.hours);
+                const status = normalizeDogDaycareStatus(row.status);
+                const currency: PetShipCurrency = row.currency === 'USD' ? 'USD' : 'EUR';
+                const full: DogDaycareRecord = {
+                    id,
+                    refCode,
+                    bookingRefCode,
+                    bookingDate,
+                    dogName,
+                    dogWeightKg,
+                    hours,
+                    status,
+                    petSeaterId: petSeater?.id,
+                    petSeaterName: petSeater?.name ?? '',
+                    notes: row.notes.trim(),
+                    price: computeDogDaycarePrice(dogWeightKg, currency, hours),
+                    currency,
+                };
+                accepted = true;
+                const exists = prev.dogDaycares.some((d) => d.id === id);
+                const dogDaycares = exists
+                    ? prev.dogDaycares.map((d) => (d.id === id ? full : d))
+                    : [...prev.dogDaycares, full];
+
+                return { ...prev, dogDaycares };
+            });
+
+            return accepted;
+        },
+        []
+    );
+
+    const deleteDogDaycare = useCallback((id: string) => {
+        setState((prev) => ({
+            ...prev,
+            dogDaycares: prev.dogDaycares.filter((d) => d.id !== id),
+        }));
+    }, []);
+
     const value = useMemo<PetLogisticsContextValue>(
         () => ({
             points: state.points,
             petShips: state.petShips,
             bookings: state.bookings,
+            dogDaycares: state.dogDaycares,
+            petSeaters: state.petSeaters,
+            activePetSeaters,
             pointOptionLabel,
             petShipOptionLabel,
             petShipRouteText,
+            petSeaterOptionLabel,
             getPoint,
             bookablePetShips,
             upsertPoint,
@@ -445,14 +731,22 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
             deletePetShip,
             upsertBooking,
             deleteBooking,
+            upsertDogDaycare,
+            deleteDogDaycare,
+            upsertPetSeater,
+            deletePetSeater,
         }),
         [
             state.points,
             state.petShips,
             state.bookings,
+            state.dogDaycares,
+            state.petSeaters,
+            activePetSeaters,
             pointOptionLabel,
             petShipOptionLabel,
             petShipRouteText,
+            petSeaterOptionLabel,
             getPoint,
             bookablePetShips,
             upsertPoint,
@@ -461,6 +755,10 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
             deletePetShip,
             upsertBooking,
             deleteBooking,
+            upsertDogDaycare,
+            deleteDogDaycare,
+            upsertPetSeater,
+            deletePetSeater,
         ]
     );
 

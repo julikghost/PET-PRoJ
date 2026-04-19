@@ -101,24 +101,34 @@ export class Booking {
             await expect(modal).toBeVisible();
             await modal.getByTestId('booking-field-ref').fill(values.refCode);
 
-            await modal.getByTestId('booking-field-pet-ship').click();
-            const petShipDropdown = this.visibleSelectDropdown().last();
-            await expect(petShipDropdown).toBeVisible({ timeout: 15000 });
-            await petShipDropdown
-                .locator('.ant-select-item-option-content')
-                .filter({ hasText: values.petShipLabel })
-                .first()
-                .click({ force: true });
-            await modal.locator('.ant-modal-title').click();
+            const petShipField = modal.getByTestId('booking-field-pet-ship');
+            await petShipField.locator('.ant-select-selector').click({ force: true });
+            const petShipSearch = petShipField
+                .locator('input[type="search"]')
+                .or(petShipField.locator('.ant-select-selection-search-input'))
+                .first();
+            await expect(petShipSearch).toBeVisible({ timeout: 5000 });
+            await petShipSearch.fill(values.petShipLabel);
+            await petShipSearch.press('Enter');
+            await expect(
+                petShipField.locator('.ant-select-selection-item').filter({ hasText: values.petShipLabel }).first()
+            ).toBeVisible({ timeout: 15000 });
 
             const dateInput = modal.getByTestId('booking-field-date').getByRole('textbox');
             await dateInput.click({ force: true });
             const dateDropdown = this.page.locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)').last();
-            await expect(dateDropdown).toBeVisible({ timeout: 15000 });
-            const dateCell = dateDropdown.locator(`td[title="${values.dateYmd}"]`).first();
-            if (await dateCell.count()) {
-                await dateCell.click({ force: true });
-            } else {
+            let pickedFromCalendar = false;
+            try {
+                await expect(dateDropdown).toBeVisible({ timeout: 3000 });
+                const dateCell = dateDropdown.locator(`td[title="${values.dateYmd}"]`).first();
+                if (await dateCell.count()) {
+                    await dateCell.click({ force: true });
+                    pickedFromCalendar = true;
+                }
+            } catch {
+                /* fallback to plain input */
+            }
+            if (!pickedFromCalendar) {
                 await dateInput.clear();
                 await dateInput.fill(values.dateYmd);
                 await dateInput.press('Enter');
