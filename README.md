@@ -43,7 +43,7 @@ Core automation practices:
 ## Repository Structure
 
 - `pet-app/` - UI app and local API stub (`POST /api/graphql`)
-- `tests/auth/` - setup project for login and session persistence
+- `tests/auth/` - PET stub role smoke (`logistics_role_smoke`) + session persistence (`logistics_session`)
 - `tests/logistics/` - business E2E scenarios
 - `pageObjects/` - page object classes
 - `storageState/` - persisted session state (gitignored)
@@ -57,7 +57,7 @@ Core automation practices:
 │  └─ POST /api/graphql (stub)
 │
 └─ tests/ (Playwright + TypeScript)
-   ├─ auth/ (session bootstrap)
+   ├─ auth/ (role login smoke, then session bootstrap)
    └─ logistics/ (business scenarios)
 
 pageObjects/ (Page Object Model)
@@ -118,13 +118,16 @@ taskkill /PID <pid_from_last_column> /F
 2. Run Playwright commands from the repository root:
 
 ```bash
-# Full run (setup + logistics)
+# Full run: role smoke → persist user session → logistics specs
 npm run e2e
 
-# Logistics tests only
+# Same suite with an explicit `tests/` path (see `package.json`)
 npm run e2e-logistics
 
-# Session setup only
+# PET stub: login smoke per role only
+npx playwright test --project=logistics_role_smoke
+
+# Persist session (runs role smoke first — Playwright project dependencies)
 npx playwright test --project=logistics_session
 
 # Single spec
@@ -156,7 +159,7 @@ When finished, remove containers (and anonymous volumes if any):
 docker compose -f docker-compose.e2e.yml down -v
 ```
 
-**GitHub Actions:** the same stack runs in [`.github/workflows/e2e-docker.yml`](.github/workflows/e2e-docker.yml) on pushes and pull requests to `main` — the workflow uses a **matrix**: each logistics spec is a **separate job** (named `E2E Docker / points`, `/ booking`, …) so the Actions UI shows per-file results. Each job builds the `pet-app` image, then runs Compose with `--no-build` and sets `E2E_PLAYWRIGHT_SPEC` to that file (`logistics_session` still runs first because of Playwright project `dependencies`). On failure, artifacts are uploaded as `e2e-docker-artifacts-<name>`.
+**GitHub Actions:** the same stack runs in [`.github/workflows/e2e-docker.yml`](.github/workflows/e2e-docker.yml) on pushes and pull requests to `main` — the workflow uses a **matrix**: each logistics spec is a **separate job** (named `E2E Docker / points`, `/ booking`, …) so the Actions UI shows per-file results. Each job builds the `pet-app` image, then runs Compose with `--no-build` and sets `E2E_PLAYWRIGHT_SPEC` to that file. Playwright runs **`logistics_role_smoke`** first (per-role PET stub login), then **`logistics_session`** (persist user `storageState`), then the chosen spec (`dependencies` in `playwright.config.ts`). On failure, artifacts are uploaded as `e2e-docker-artifacts-<name>`.
 
 To run **one** spec locally in Docker (same variable as CI):
 
@@ -192,6 +195,7 @@ allure open allure-report
 | Reports test skipped | Add `fixtures.local.json` or set `LOGISTICS_REPORT_FIXTURES_JSON` |
 | Docker E2E fails to pull Playwright image | Check tag in `docker-compose.e2e.yml` matches `@playwright/test` in `package-lock.json` |
 | Docker E2E: login / home never appears | `vite preview` needs an SPA fallback for `/login` etc.; `pet-app/vite-plugin-pet-api.ts` adds it for preview — rebuild the `pet-app` image (`docker compose … build pet-app`) |
+| Docker E2E: invalid password / login after changing `.env` | PET stub passwords are baked at **`npm run build`** (`VITE_PET_*`). They must match root `.env` `LOGISTICS_*`. Rebuild: `docker compose -f docker-compose.e2e.yml build --no-cache pet-app` (see comments in `docker-compose.e2e.yml`) |
 
 ## Important Notes
 

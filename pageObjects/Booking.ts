@@ -119,7 +119,13 @@ export class Booking {
             ).toBeVisible({ timeout: 15000 });
 
             const dateField = modal.getByTestId('booking-field-date');
-            const dateInput = dateField.locator('.ant-picker-input input').first();
+            await expect(dateField).toBeVisible({ timeout: 15000 });
+            /** Ant Design DatePicker: avoid coupling to `.ant-picker-input` (markup varies by version). */
+            const dateInput = dateField
+                .getByRole('textbox')
+                .or(dateField.locator('input:not([type="hidden"])'))
+                .first();
+            await expect(dateInput).toBeVisible({ timeout: 15000 });
             await dateInput.click({ force: true });
             const dateDropdown = this.page.locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)').last();
             let pickedFromCalendar = false;

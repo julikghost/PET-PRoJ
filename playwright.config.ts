@@ -1,5 +1,7 @@
 /**
- * Playwright configuration: `logistics_session` (persist session), `logistics_web` (CRUD + Reports).
+ * Playwright configuration:
+ * `logistics_role_smoke` (PET stub login per role), `logistics_session` (persist session),
+ * `logistics_web` (CRUD + Reports).
  */
 import { defineConfig } from '@playwright/test';
 import { config, storageStatePath } from './config-logistics';
@@ -41,6 +43,15 @@ export default defineConfig({
     },
     projects: [
         {
+            name: 'logistics_role_smoke',
+            testDir: './tests/auth',
+            testMatch: /roleLogin\.smoke\.spec\.ts/,
+            use: {
+                ...defaultOptions,
+                ...(baseUrl.trim() ? { baseURL: baseUrl } : {}),
+            },
+        },
+        {
             name: 'logistics_session',
             testDir: './tests/auth',
             testMatch: /.*logisticsSession\.setup\.ts/,
@@ -48,6 +59,7 @@ export default defineConfig({
                 ...defaultOptions,
                 ...(baseUrl.trim() ? { baseURL: baseUrl } : {}),
             },
+            dependencies: ['logistics_role_smoke'],
         },
         {
             name: 'logistics_web',
@@ -57,7 +69,7 @@ export default defineConfig({
                 storageState: storageStatePath,
             },
             testDir: './tests/logistics',
-            dependencies: ['logistics_session'],
+            dependencies: ['logistics_role_smoke', 'logistics_session'],
         },
     ],
 });
