@@ -31,6 +31,13 @@ setup('Persist logistics web session storage', async ({ page }) => {
                 'LOGISTICS_BASE_CLIENT_URL is empty — set it (e.g. http://pet-app:5173/ in Docker Compose).'
             );
         }
+        if (!uiUsername?.trim() || !password?.trim()) {
+            throw new Error(
+                'PET stub login needs LOGISTICS_UI_USER_NAME and LOGISTICS_PASSWORD in repo-root `.env` '
+                + '(copy from `.env.example`). If `.env` was copied from an older broken example, '
+                + 'ensure `LOGISTICS_BASE_API_URL` and `LOGISTICS_UI_USER_NAME` are on separate lines.'
+            );
+        }
         await openPetStubLoginPage(page, baseUrl);
 
         await app.login.signInPetApp(uiUsername, password);
