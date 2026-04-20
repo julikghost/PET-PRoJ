@@ -222,6 +222,7 @@ allure open allure-report
 |-------|----------|
 | Port `5173` is busy | Set `PET_DEV_PORT` in `pet-app/.env` and update root `.env` URLs |
 | Stale session errors | Delete `storageState/session.json` and rerun `npm run e2e` |
+| `ENOENT … storageState/session.json` in Docker CI | With `E2E_WEB_NO_DEPS=1`, Playwright uses `--no-deps` and expects `storageState/session.json` from a **prep job** (GitHub: `e2e-session-prep` uploads `e2e-storage-state`). Either add the same prep + artifact in GitLab, or unset `E2E_WEB_NO_DEPS` — `scripts/docker-e2e-run.sh` automatically runs with dependencies if the file is missing. |
 | Tests timeout | Increase `timeout` in `playwright.config.ts` or use `--timeout=60000` flag |
 | Allure not showing results | Ensure you ran `npm run e2e` (not with `--reporter=line` override) |
 | Reports test skipped | Add `fixtures.local.json` or set `LOGISTICS_REPORT_FIXTURES_JSON` |
