@@ -10,8 +10,11 @@
     "e2e": "npx playwright test --config=./playwright.config.ts",
     "e2e-logistics": "npx playwright test tests --config=./playwright.config.ts",
     "pet:dev": "npm run dev --prefix pet-app",
+    "pet:install": "npm ci --prefix pet-app",
     "docker:pet:build": "docker build -t logistics-pet-ui ./pet-app",
-    "docker:pet:up": "docker compose up --build pet-app"
+    "docker:pet:up": "docker compose up --build pet-app",
+    "docker:e2e:stack": "bash .github/scripts/ci/compose-e2e-stack.sh up --build --abort-on-container-exit --exit-code-from e2e",
+    "qase:push-requirements": "node scripts/push-qase-requirements.mjs"
   },
   "keywords": [],
   "author": "",

@@ -24,14 +24,18 @@ export class Booking {
 
     private selectDropdownWithOption (optionName: string, exact = true): Locator {
         if (exact) {
-            return this.visibleSelectDropdown().filter({
-                has: this.page.getByRole('option', { name: optionName, exact: true }),
-            });
+            return this.visibleSelectDropdown()
+                .filter({
+                    has: this.page.getByRole('option', { name: optionName, exact: true }),
+                })
+                .last();
         }
 
-        return this.visibleSelectDropdown().filter({
-            has: this.page.locator('.ant-select-item-option-content').filter({ hasText: optionName }),
-        });
+        return this.visibleSelectDropdown()
+            .filter({
+                has: this.page.locator('.ant-select-item-option-content').filter({ hasText: optionName }),
+            })
+            .last();
     }
 
     private async selectOptionByClick (
@@ -55,10 +59,11 @@ export class Booking {
     ): Promise<void> {
         await field.locator('.ant-select-selector').click({ force: true });
         const search = field
-            .locator('input[type="search"]')
+            .getByRole('combobox')
+            .or(field.locator('input[type="search"]'))
             .or(field.locator('.ant-select-selection-search-input'))
             .first();
-        await expect(search).toBeVisible({ timeout: 5000 });
+        await expect(search).toBeVisible({ timeout: 10000 });
         await search.fill(optionName);
         const dropdown = this.selectDropdownWithOption(optionName);
         await expect(dropdown).toBeVisible({ timeout: 15000 });
@@ -114,7 +119,14 @@ export class Booking {
                 petShipField.locator('.ant-select-selection-item').filter({ hasText: values.petShipLabel }).first()
             ).toBeVisible({ timeout: 15000 });
 
-            const dateInput = modal.getByTestId('booking-field-date').getByRole('textbox');
+            const dateField = modal.getByTestId('booking-field-date');
+            await expect(dateField).toBeVisible({ timeout: 15000 });
+            /** Ant Design DatePicker: avoid coupling to `.ant-picker-input` (markup varies by version). */
+            const dateInput = dateField
+                .getByRole('textbox')
+                .or(dateField.locator('input:not([type="hidden"])'))
+                .first();
+            await expect(dateInput).toBeVisible({ timeout: 15000 });
             await dateInput.click({ force: true });
             const dateDropdown = this.page.locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)').last();
             let pickedFromCalendar = false;
@@ -129,6 +141,12 @@ export class Booking {
                 /* fallback to plain input */
             }
             if (!pickedFromCalendar) {
+                // Picker may be open with no matching cell (e.g. wrong month); it blocks the input for clear/fill.
+                await this.page.keyboard.press('Escape');
+                await this.page
+                    .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
+                    .waitFor({ state: 'hidden', timeout: 5000 })
+                    .catch(() => {});
                 await dateInput.clear();
                 await dateInput.fill(values.dateYmd);
                 await dateInput.press('Enter');

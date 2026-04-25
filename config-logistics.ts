@@ -14,7 +14,8 @@ function loadEnvFromRepoRoot (): void {
     ];
     for (const p of candidates) {
         if (fs.existsSync(p)) {
-            dotenv.config({ path: p });
+            // `override: false`: Compose / CI already set `LOGISTICS_*` etc.; mounted `.env` must not overwrite them.
+            dotenv.config({ path: p, override: false });
         }
     }
 }
@@ -26,6 +27,7 @@ function resolveStorageStatePath (): string {
     if (custom) {
         return path.isAbsolute(custom) ? custom : path.join(process.cwd(), custom);
     }
+
     return path.join(process.cwd(), 'storageState', 'session.json');
 }
 

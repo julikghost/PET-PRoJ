@@ -289,7 +289,11 @@ export function BookingPage (): JSX.Element {
                     </Form.Item>
                     <Form.Item name="date" label="Date" rules={[{ required: true }]}>
                         <div data-testid="booking-field-date">
-                            <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
+                            <DatePicker
+                                style={{ width: '100%' }}
+                                format="YYYY-MM-DD"
+                                inputReadOnly={false}
+                            />
                         </div>
                     </Form.Item>
                     <Form.Item

@@ -45,3 +45,12 @@ export const MENU_ITEM = {
         route: 'europe-shows',
     },
 };
+
+/** Matches `pet-app` ReportsPage `data-testid` — stable anchors for FormFields / E2E. */
+export const REPORTS_DATA_TESTID = {
+    /** `Form.Item` wrapper — always in DOM; prefer for waits / opening `.ant-select` inside. */
+    petMoverField: 'pet-reports-pet-mover-field',
+    /** Inner Ant `Select` (may vary by antd version). */
+    petMoverSelect: 'pet-reports-pet-mover',
+    sendReportToEmail: 'pet-reports-send-to-email',
+} as const;

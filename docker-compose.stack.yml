@@ -1,0 +1,119 @@
+# Full stack for E2E: Postgres → API (ждёт TCP к БД, HTTP :3000) → PET UI → Playwright.
+# Порядок готовности: depends_on + healthcheck — БД → api → pet-app → e2e.
+#
+# Запуск: npm run docker:e2e:stack  или  bash .github/scripts/ci/compose-e2e-stack.sh up --build …
+# Через общую обёртку CI: E2E_COMPOSE_STACK=1 bash .github/scripts/ci/compose-e2e.sh …
+#
+# Реальный бэкенд: замените сервис `api` на свой образ (и healthcheck/command). В сервисе `e2e` задайте
+# LOGISTICS_BASE_API_URL на внутренний URL API (например http://api:8080/). При необходимости — build-args pet-app.
+#
+# Минимальный стек (только UI + e2e, как в GitHub Actions по умолчанию): docker-compose.e2e.yml + compose-e2e.sh
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${STACK_POSTGRES_USER:-pet}
+      POSTGRES_PASSWORD: ${STACK_POSTGRES_PASSWORD:-pet}
+      POSTGRES_DB: ${STACK_POSTGRES_DB:-pet_logistics}
+    expose:
+      - "5432"
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  api:
+    image: node:20-bookworm-slim
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+    working_dir: /app
+    volumes:
+      - ./scripts/stack-api-entry.mjs:/app/entry.mjs:ro
+    command: ['node', '/app/entry.mjs']
+    expose:
+      - "3000"
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://127.0.0.1:3000/',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 4s
+      timeout: 3s
+      retries: 18
+      start_period: 20s
+
+  pet-app:
+    build:
+      context: ./pet-app
+      dockerfile: Dockerfile
+      args:
+        VITE_PET_USER: ${LOGISTICS_UI_USER_NAME:-pet@example.com}
+        VITE_PET_PASSWORD: ${LOGISTICS_PASSWORD:-pet-secret}
+        VITE_PET_ADMIN_USER: ${LOGISTICS_ADMIN_USER_NAME:-pet-admin@example.com}
+        VITE_PET_ADMIN_PASSWORD: ${LOGISTICS_ADMIN_PASSWORD:-pet-admin-secret}
+        VITE_PET_ACCOUNTANT_USER: ${LOGISTICS_ACCOUNTANT_USER_NAME:-pet-accountant@example.com}
+        VITE_PET_ACCOUNTANT_PASSWORD: ${LOGISTICS_ACCOUNTANT_PASSWORD:-pet-accountant-secret}
+    depends_on:
+      api:
+        condition: service_healthy
+    expose:
+      - "5173"
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://127.0.0.1:5173/login',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 18
+      start_period: 50s
+
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.57.0-noble
+    user: root
+    init: true
+    shm_size: '2gb'
+    tmpfs:
+      - /tmp:size=1g,exec
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      pet-app:
+        condition: service_healthy
+    working_dir: /work
+    volumes:
+      - .:/work
+    environment:
+      LOGISTICS_BASE_CLIENT_URL: http://pet-app:5173/
+      LOGISTICS_BASE_API_URL: http://pet-app:5173/api
+      LOGISTICS_UI_USER_NAME: ${LOGISTICS_UI_USER_NAME:-pet@example.com}
+      LOGISTICS_PASSWORD: ${LOGISTICS_PASSWORD:-pet-secret}
+      LOGISTICS_ADMIN_USER_NAME: ${LOGISTICS_ADMIN_USER_NAME:-pet-admin@example.com}
+      LOGISTICS_ADMIN_PASSWORD: ${LOGISTICS_ADMIN_PASSWORD:-pet-admin-secret}
+      LOGISTICS_ACCOUNTANT_USER_NAME: ${LOGISTICS_ACCOUNTANT_USER_NAME:-pet-accountant@example.com}
+      LOGISTICS_ACCOUNTANT_PASSWORD: ${LOGISTICS_ACCOUNTANT_PASSWORD:-pet-accountant-secret}
+      E2E_LOGIN_USER_FIELD_NAME: ${E2E_LOGIN_USER_FIELD_NAME:-identifier}
+      E2E_TIME_ZONE: ${E2E_TIME_ZONE:-UTC}
+      E2E_PET_STUB_LOGIN: '1'
+      E2E_DOCKER: '1'
+      CI: 'true'
+      E2E_STORAGE_STATE_PATH: ${E2E_STORAGE_STATE_PATH:-storageState/session.json}
+      E2E_PLAYWRIGHT_WORKERS: ${E2E_PLAYWRIGHT_WORKERS:-4}
+      E2E_PLAYWRIGHT_SPEC: ${E2E_PLAYWRIGHT_SPEC:-}
+      E2E_WEB_NO_DEPS: ${E2E_WEB_NO_DEPS:-}
+    command:
+      - bash
+      - /work/scripts/docker-e2e-run.sh

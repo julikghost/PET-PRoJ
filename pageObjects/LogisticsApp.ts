@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { config } from '../config-logistics';
+import { openPetStubLoginPage } from '../utils/petStubLoginPage';
 import { MENU_ITEM } from '../utils/constants';
 import { Login } from './Login';
 import { Reports } from './Reports';
@@ -13,6 +14,9 @@ import { PetShipping } from './PetShipping';
 import { Booking } from './Booking';
 import { Points } from './Points';
 import { NavigationSidebar } from './NavigationSidebar';
+
+/** Docker runners are slower; PET stub navigation after submit needs more slack than local dev. */
+const PET_POST_LOGIN_ASSERT_MS = process.env.E2E_DOCKER === '1' ? 45_000 : 20_000;
 
 export class LogisticsApp {
     readonly page: Page;
@@ -65,13 +69,9 @@ export class LogisticsApp {
                     'LOGISTICS_ADMIN_USER_NAME and LOGISTICS_ADMIN_PASSWORD must be set for PetAdmin flows.'
                 );
             }
-            await this.page.goto('/');
-            await this.page.evaluate(() => {
-                localStorage.removeItem('pet-auth');
-            });
-            await this.page.goto('/login');
+            await openPetStubLoginPage(this.page, config.baseUrl);
             await this.login.signInPetApp(adminUsername, adminPassword);
-            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: 20000 });
+            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: PET_POST_LOGIN_ASSERT_MS });
         });
     }
 
@@ -86,13 +86,9 @@ export class LogisticsApp {
                     'LOGISTICS_UI_USER_NAME (or LOGISTICS_E2E_USER_NAME) and LOGISTICS_PASSWORD must be set.'
                 );
             }
-            await this.page.goto('/');
-            await this.page.evaluate(() => {
-                localStorage.removeItem('pet-auth');
-            });
-            await this.page.goto('/login');
+            await openPetStubLoginPage(this.page, config.baseUrl);
             await this.login.signInPetApp(uiUsername, password);
-            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: 20000 });
+            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: PET_POST_LOGIN_ASSERT_MS });
         });
     }
 
@@ -211,13 +207,9 @@ export class LogisticsApp {
                     'LOGISTICS_ACCOUNTANT_USER_NAME and LOGISTICS_ACCOUNTANT_PASSWORD must be set for PetAccountant flows.'
                 );
             }
-            await this.page.goto('/');
-            await this.page.evaluate(() => {
-                localStorage.removeItem('pet-auth');
-            });
-            await this.page.goto('/login');
+            await openPetStubLoginPage(this.page, config.baseUrl);
             await this.login.signInPetApp(accountantUsername, accountantPassword);
-            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: 20000 });
+            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: PET_POST_LOGIN_ASSERT_MS });
         });
     }
 
