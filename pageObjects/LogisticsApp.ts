@@ -12,6 +12,7 @@ import { Reports } from './Reports';
 import { PetMovers } from './PetMovers';
 import { PetShipping } from './PetShipping';
 import { Booking } from './Booking';
+import { DogDaycare } from './DogDaycare';
 import { Points } from './Points';
 import { NavigationSidebar } from './NavigationSidebar';
 
@@ -25,6 +26,7 @@ export class LogisticsApp {
     readonly petMovers: PetMovers;
     readonly petShipping: PetShipping;
     readonly booking: Booking;
+    readonly dogDaycare: DogDaycare;
     readonly points: Points;
     readonly navigationSidebar: NavigationSidebar;
 
@@ -35,6 +37,7 @@ export class LogisticsApp {
         this.petMovers = new PetMovers(page);
         this.petShipping = new PetShipping(page);
         this.booking = new Booking(page);
+        this.dogDaycare = new DogDaycare(page);
         this.points = new Points(page);
         this.navigationSidebar = new NavigationSidebar(page);
     }
