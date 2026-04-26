@@ -4,6 +4,7 @@
  */
 import { test, expect } from '@playwright/test';
 import type { Page, Locator } from '@playwright/test';
+import { expectAntSelectDropdownsClosed } from '../utils/antdUiWaits';
 import { reports as reportUi } from '../utils/text';
 
 export class FormFields {
@@ -115,7 +116,7 @@ export class FormFields {
             } else {
                 await this.page.keyboard.press('Escape').catch(() => {});
             }
-            await this.page.waitForTimeout(300);
+            await expectAntSelectDropdownsClosed(this.page);
 
             await expect(selectTrigger).toContainText(optionsArray[0], { timeout: 8000 });
         });
@@ -414,10 +415,9 @@ export class FormFields {
             
             // Click the option
             await optionText.click();
-            
-            // Wait for dropdown to close (the input should not have focus)
-            await this.page.waitForTimeout(500);
-            
+
+            await expectAntSelectDropdownsClosed(this.page);
+
             // Verify the field is filled
             await this.verifyFieldState(fieldLocator, name, true);
         });
@@ -443,10 +443,9 @@ export class FormFields {
             
             // Click the option
             await optionText.click();
-            
-            // Wait for dropdown to close
-            await this.page.waitForTimeout(500);
-            
+
+            await expectAntSelectDropdownsClosed(this.page);
+
             // Verify the field is filled
             await this.verifyFieldState(fieldLocator, name, true);
         });

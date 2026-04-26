@@ -3,6 +3,7 @@
  */
 import { test, expect } from '@playwright/test';
 import type { Page, Locator } from '@playwright/test';
+import { expectAntPickerDropdownsClosed, expectAntSelectDropdownsClosed } from '../utils/antdUiWaits';
 import { dogDaycare as dogDaycareText } from '../utils/text';
 
 export class DogDaycare {
@@ -22,6 +23,43 @@ export class DogDaycare {
         return this.page.getByRole('dialog').filter({ has: this.page.getByTestId('daycare-form') });
     }
 
+    private visibleAntSelectDropdown (): Locator {
+        return this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
+    }
+
+    private visibleAntPickerDropdown (): Locator {
+        return this.page.locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)').last();
+    }
+
+    private async antSelectAlreadyShows (field: Locator, optionName: string): Promise<boolean> {
+        const selected = field.locator('.ant-select-selection-item');
+        return (await selected.filter({ hasText: optionName }).count()) > 0;
+    }
+
+    private optionIndexOrThrow (optionName: string, orderedLabels: string[]): number {
+        const idx = orderedLabels.indexOf(optionName);
+        if (idx === -1) {
+            throw new Error(`Unknown option label: ${optionName}`);
+        }
+        return idx;
+    }
+
+    private async openAntSelect (field: Locator): Promise<void> {
+        await field.locator('.ant-select-selector').click({ force: true });
+        await expect(this.visibleAntSelectDropdown()).toBeVisible({ timeout: 15000 });
+    }
+
+    private async chooseAntSelectOptionByKeyboard (targetIdx: number): Promise<void> {
+        for (let i = 0; i < targetIdx; i++) {
+            await this.page.keyboard.press('ArrowDown');
+        }
+        await this.page.keyboard.press('Enter');
+    }
+
+    private async waitUntilAntSelectDropdownClosed (): Promise<void> {
+        await expectAntSelectDropdownsClosed(this.page);
+    }
+
     /**
      * If the Select already shows this label, skip. Otherwise open and pick by index with ArrowDown + Enter
      * (clicks on options are flaky when the long modal + portal push options outside the viewport).
@@ -32,58 +70,91 @@ export class DogDaycare {
         /** Ordered option labels (must match the Select options, first = index 0). */
         orderedLabels: string[]
     ): Promise<void> {
-        const selected = field.locator('.ant-select-selection-item');
-        if (await selected.filter({ hasText: optionName }).count() > 0) {
+        if (await this.antSelectAlreadyShows(field, optionName)) {
             return;
         }
-        const targetIdx = orderedLabels.indexOf(optionName);
-        if (targetIdx === -1) {
-            throw new Error(`Unknown option label: ${optionName}`);
-        }
-        await field.locator('.ant-select-selector').click({ force: true });
-        const anyDd = this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
-        await expect(anyDd).toBeVisible({ timeout: 15000 });
-        for (let i = 0; i < targetIdx; i++) {
-            await this.page.keyboard.press('ArrowDown');
-        }
-        await this.page.keyboard.press('Enter');
-        await expect.poll(
-            async () => await this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').count(),
-            { timeout: 15000 }
-        ).toBe(0);
+        const targetIdx = this.optionIndexOrThrow(optionName, orderedLabels);
+        await this.openAntSelect(field);
+        await this.chooseAntSelectOptionByKeyboard(targetIdx);
+        await this.waitUntilAntSelectDropdownClosed();
     }
 
-    private async fillBookingDateYmd (modal: Locator, dateYmd: string): Promise<void> {
+    private async resolveBookingDateInput (modal: Locator): Promise<Locator> {
         const dateField = modal.getByTestId('daycare-field-booking-date');
         await expect(dateField).toBeVisible({ timeout: 15000 });
         const dateInput = dateField.locator('input').first();
         await expect(dateInput).toBeVisible({ timeout: 15000 });
-        await dateInput.click({ force: true });
-        const dateDropdown = this.page.locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)').last();
-        let pickedFromCalendar = false;
+        return dateInput;
+    }
+
+    /** Returns true if a calendar cell was clicked for dateYmd. */
+    private async tryPickDateFromAntCalendar (dateYmd: string): Promise<boolean> {
+        const dateDropdown = this.visibleAntPickerDropdown();
         try {
             await expect(dateDropdown).toBeVisible({ timeout: 3000 });
             const dateCell = dateDropdown.locator(`td[title="${dateYmd}"]`).first();
             if (await dateCell.count()) {
                 await dateCell.click({ force: true });
-                pickedFromCalendar = true;
+                return true;
             }
         } catch {
             /* use manual input path */
         }
+        return false;
+    }
+
+    /**
+     * Do not press Escape: Ant Design may close the whole form Modal. Blur the picker via another field.
+     */
+    private async fillBookingDateByTyping (modal: Locator, dateInput: Locator, dateYmd: string): Promise<void> {
+        await modal.getByTestId('daycare-field-ref').click({ force: true });
+        await expectAntPickerDropdownsClosed(this.page);
+        await dateInput.click({ force: true });
+        await this.page.keyboard.press('Control+a');
+        await dateInput.fill(dateYmd, { force: true });
+        await dateInput.press('Enter');
+    }
+
+    private async fillBookingDateYmd (modal: Locator, dateYmd: string): Promise<void> {
+        const dateInput = await this.resolveBookingDateInput(modal);
+        await dateInput.click({ force: true });
+        const pickedFromCalendar = await this.tryPickDateFromAntCalendar(dateYmd);
         if (!pickedFromCalendar) {
-            // Do not press Escape: Ant Design may close the whole form Modal. Blur the picker via another field.
-            await modal.getByTestId('daycare-field-ref').click({ force: true });
-            await this.page
-                .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
-                .waitFor({ state: 'hidden', timeout: 5000 })
-                .catch(() => {});
-            await dateInput.click({ force: true });
-            await this.page.keyboard.press('Control+a');
-            await dateInput.fill(dateYmd, { force: true });
-            await dateInput.press('Enter');
+            await this.fillBookingDateByTyping(modal, dateInput, dateYmd);
         }
         await expect(dateInput).toHaveValue(dateYmd, { timeout: 15000 });
+    }
+
+    private async fillWeightAndHoursInputs (
+        modal: Locator,
+        dogWeightKg: string,
+        hours: string
+    ): Promise<void> {
+        const weightInput = modal.getByTestId('daycare-field-weight').locator('input');
+        await weightInput.click();
+        await weightInput.clear();
+        await weightInput.fill(dogWeightKg);
+        const hoursInput = modal.getByTestId('daycare-field-hours').locator('input');
+        await hoursInput.click();
+        await hoursInput.clear();
+        await hoursInput.fill(hours);
+    }
+
+    private async fillCurrencyAndStatusSelects (
+        modal: Locator,
+        currencyLabel: string,
+        statusLabel: string
+    ): Promise<void> {
+        await this.selectOptionIfNotActive(modal.getByTestId('daycare-field-currency'), currencyLabel, [
+            'EUR',
+            'USD',
+        ]);
+        await this.selectOptionIfNotActive(modal.getByTestId('daycare-field-status'), statusLabel, [
+            'Scheduled',
+            'Checked in',
+            'Active',
+            'Checked out',
+        ]);
     }
 
     async expectLoaded (): Promise<void> {
@@ -121,23 +192,8 @@ export class DogDaycare {
             await modal.getByTestId('daycare-field-booking-ref').fill(values.bookingRefCode);
             await this.fillBookingDateYmd(modal, values.bookingDateYmd);
             await modal.getByTestId('daycare-field-dog-name').fill(values.dogName);
-            const weightInput = modal.getByTestId('daycare-field-weight').locator('input');
-            await weightInput.click();
-            await weightInput.clear();
-            await weightInput.fill(values.dogWeightKg);
-            const currencyField = modal.getByTestId('daycare-field-currency');
-            await this.selectOptionIfNotActive(currencyField, values.currencyLabel, ['EUR', 'USD']);
-            const hoursInput = modal.getByTestId('daycare-field-hours').locator('input');
-            await hoursInput.click();
-            await hoursInput.clear();
-            await hoursInput.fill(values.hours);
-            const statusField = modal.getByTestId('daycare-field-status');
-            await this.selectOptionIfNotActive(statusField, values.statusLabel, [
-                'Scheduled',
-                'Checked in',
-                'Active',
-                'Checked out',
-            ]);
+            await this.fillWeightAndHoursInputs(modal, values.dogWeightKg, values.hours);
+            await this.fillCurrencyAndStatusSelects(modal, values.currencyLabel, values.statusLabel);
             if (values.notes !== undefined) {
                 await modal.getByTestId('daycare-field-notes').fill(values.notes);
             }

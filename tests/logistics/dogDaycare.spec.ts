@@ -1,5 +1,7 @@
 import { config } from '../../config-logistics';
 import { MENU_ITEM } from '../../utils/constants';
+import { getTodayAndTomorrowDays } from '../../utils/date';
+import { E2E_SKIP, e2eDogDaycare, e2eRefs } from '../../utils/e2eTestData';
 import { dogDaycare as dogDaycareText } from '../../utils/text';
 import { expect, test } from '../fixtures/logisticsApp.fixture';
 
@@ -7,7 +9,9 @@ const { uiUsername, password } = config;
 
 test.describe('Dog Daycare', () => {
     test('create, update, delete daycare stop', async ({ page, logisticsApp }) => {
-        test.skip(!uiUsername || !password, 'Set LOGISTICS_UI_USER_NAME and LOGISTICS_PASSWORD');
+        test.skip(!uiUsername || !password, E2E_SKIP.LOGISTICS_UI_CREDENTIALS);
+
+        const { todayDay: bookingDateYmd } = getTodayAndTomorrowDays();
 
         await page.goto('/home');
         await logisticsApp.clearPetLogisticsData();
@@ -17,47 +21,49 @@ test.describe('Dog Daycare', () => {
         await dc.expectLoaded();
 
         const ts = Date.now();
-        const refCode = `E2E-DC-${ts}`;
-        const bookingRef = `BK-DC-${ts}`;
-        const t = new Date();
-        const bookingDateYmd = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(
-            t.getDate()
-        ).padStart(2, '0')}`;
+        let refCode: string | undefined;
+        const bookingRef = e2eRefs.dogDaycareBooking(ts);
 
-        await dc.clickAdd();
-        await dc.fillForm({
-            refCode,
-            bookingRefCode: bookingRef,
-            bookingDateYmd,
-            dogName: 'E2E Rex',
-            dogWeightKg: '8',
-            currencyLabel: 'EUR',
-            hours: '4',
-            statusLabel: 'Scheduled',
-        });
-        await dc.saveModal();
-        await expect(page.getByText(dogDaycareText.toastCreated).first()).toBeVisible();
-        await dc.expectRowContains(refCode);
-        await dc.expectRowContains('E2E Rex');
+        try {
+            refCode = e2eRefs.dogDaycare(ts);
 
-        await dc.clickEdit(refCode);
-        await dc.fillForm({
-            refCode,
-            bookingRefCode: bookingRef,
-            bookingDateYmd,
-            dogName: 'E2E Rex Pro',
-            dogWeightKg: '8',
-            currencyLabel: 'EUR',
-            hours: '4',
-            statusLabel: 'Checked in',
-        });
-        await dc.saveModal();
-        await expect(page.getByText(dogDaycareText.toastUpdated).first()).toBeVisible();
-        await dc.expectRowContains('E2E Rex Pro');
+            await dc.clickAdd();
+            await dc.fillForm({
+                refCode,
+                bookingRefCode: bookingRef,
+                bookingDateYmd,
+                dogName: e2eDogDaycare.dogNameCreate,
+                dogWeightKg: e2eDogDaycare.dogWeightKg,
+                currencyLabel: e2eDogDaycare.currencyLabel,
+                hours: e2eDogDaycare.hours,
+                statusLabel: e2eDogDaycare.statusCreate,
+            });
+            await dc.saveModal();
+            await expect(page.getByText(dogDaycareText.toastCreated).first()).toBeVisible();
+            await dc.expectRowContains(refCode);
+            await dc.expectRowContains(e2eDogDaycare.dogNameCreate);
 
-        await dc.clickDelete(refCode);
-        await dc.confirmDeleteInDialog();
-        await expect(page.getByText(dogDaycareText.toastDeleted).first()).toBeVisible();
-        await dc.expectNoRowContains(refCode);
+            await dc.clickEdit(refCode);
+            await dc.fillForm({
+                refCode,
+                bookingRefCode: bookingRef,
+                bookingDateYmd,
+                dogName: e2eDogDaycare.dogNameUpdate,
+                dogWeightKg: e2eDogDaycare.dogWeightKg,
+                currencyLabel: e2eDogDaycare.currencyLabel,
+                hours: e2eDogDaycare.hours,
+                statusLabel: e2eDogDaycare.statusUpdate,
+            });
+            await dc.saveModal();
+            await expect(page.getByText(dogDaycareText.toastUpdated).first()).toBeVisible();
+            await dc.expectRowContains(e2eDogDaycare.dogNameUpdate);
+
+            await dc.clickDelete(refCode);
+            await dc.confirmDeleteInDialog();
+            await expect(page.getByText(dogDaycareText.toastDeleted).first()).toBeVisible();
+            await dc.expectNoRowContains(refCode);
+        } finally {
+            await logisticsApp.teardownPetE2eData({ dogDaycareRef: refCode });
+        }
     });
 });
