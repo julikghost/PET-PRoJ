@@ -12,6 +12,7 @@ import { Reports } from './Reports';
 import { PetMovers } from './PetMovers';
 import { PetShipping } from './PetShipping';
 import { Booking } from './Booking';
+import { DogDaycare } from './DogDaycare';
 import { Points } from './Points';
 import { NavigationSidebar } from './NavigationSidebar';
 
@@ -25,6 +26,7 @@ export class LogisticsApp {
     readonly petMovers: PetMovers;
     readonly petShipping: PetShipping;
     readonly booking: Booking;
+    readonly dogDaycare: DogDaycare;
     readonly points: Points;
     readonly navigationSidebar: NavigationSidebar;
 
@@ -35,6 +37,7 @@ export class LogisticsApp {
         this.petMovers = new PetMovers(page);
         this.petShipping = new PetShipping(page);
         this.booking = new Booking(page);
+        this.dogDaycare = new DogDaycare(page);
         this.points = new Points(page);
         this.navigationSidebar = new NavigationSidebar(page);
     }
@@ -132,20 +135,29 @@ export class LogisticsApp {
     }
 
     /**
-     * Best-effort cleanup after E2E (order: booking → pet ship → points → pet mover).
+     * Best-effort cleanup after E2E (order: booking → pet ship → points → dog daycare → pet movers).
      * Ignores missing rows / errors so `finally` stays safe.
      */
     async teardownPetE2eData (opts: {
         bookingRef?: string;
         petShipRef?: string;
         pointCodes?: string[];
+        /** Dog Daycare row ref (`daycare-delete-<ref>`). */
+        dogDaycareRef?: string;
         /** Delete one PetMover by code (legacy). */
         petMoverCode?: string;
         /** Delete several PetMovers by code. */
         petMoverCodes?: string[];
     }): Promise<void> {
-        await test.step('Teardown: E2E booking / pet ship / points / pet mover', async () => {
-            const { bookingRef, petShipRef, pointCodes = [], petMoverCode, petMoverCodes = [] } = opts;
+        await test.step('Teardown: E2E booking / pet ship / points / dog daycare / pet mover', async () => {
+            const {
+                bookingRef,
+                petShipRef,
+                pointCodes = [],
+                dogDaycareRef,
+                petMoverCode,
+                petMoverCodes = [],
+            } = opts;
             if (bookingRef) {
                 try {
                     await this.navigationSidebar.clickMenuItem(MENU_ITEM.BOOKING);
@@ -180,6 +192,19 @@ export class LogisticsApp {
                     if (await del.isVisible().catch(() => false)) {
                         await this.points.clickDelete(code);
                         await this.points.confirmDeleteInDialog();
+                    }
+                } catch {
+                    /* ignore */
+                }
+            }
+            if (dogDaycareRef) {
+                try {
+                    await this.navigationSidebar.clickMenuItem(MENU_ITEM.DOG_DAYCARE);
+                    await this.dogDaycare.expectLoaded();
+                    const del = this.page.getByTestId(`daycare-delete-${dogDaycareRef}`);
+                    if (await del.isVisible().catch(() => false)) {
+                        await this.dogDaycare.clickDelete(dogDaycareRef);
+                        await this.dogDaycare.confirmDeleteInDialog();
                     }
                 } catch {
                     /* ignore */

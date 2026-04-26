@@ -10,6 +10,9 @@ tests/logistics/fixtures.local.json
 allure-results
 storageState/*
 !storageState/.gitkeep
+# Playwright codegen output (npm run e2e:codegen)
+tests/recorded/*
+!tests/recorded/.gitkeep
 e2e-captures
 results.xml
 .DS_store

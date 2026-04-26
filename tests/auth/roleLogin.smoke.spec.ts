@@ -6,20 +6,18 @@
  */
 import { config } from '../../config-logistics';
 import { MENU_ITEM } from '../../utils/constants';
+import { E2E_SKIP } from '../../utils/e2eTestData';
 import { usePetStubLoginFlow } from '../../utils/petStubLoginFlow';
 import { expect, test } from '../fixtures/logisticsApp.fixture';
 
 test.describe('PET stub: role login smoke', () => {
     test.beforeEach(() => {
-        test.skip(
-            !usePetStubLoginFlow(),
-            'PET stub login only (E2E_PET_STUB_LOGIN / E2E_DOCKER, or local identifier + localhost)'
-        );
-        test.skip(!config.baseUrl?.trim(), 'LOGISTICS_BASE_CLIENT_URL is empty');
+        test.skip(!usePetStubLoginFlow(), E2E_SKIP.PET_STUB_LOGIN);
+        test.skip(!config.baseUrl?.trim(), E2E_SKIP.BASE_URL_EMPTY);
     });
 
     test('PetUser signs in and reaches Home', async ({ page, logisticsApp }) => {
-        test.skip(!config.uiUsername || !config.password, 'Set LOGISTICS_UI_USER_NAME and LOGISTICS_PASSWORD');
+        test.skip(!config.uiUsername || !config.password, E2E_SKIP.LOGISTICS_UI_CREDENTIALS);
 
         const header = page.getByRole('banner');
         const sider = page.locator('.ant-layout-sider');
@@ -37,7 +35,7 @@ test.describe('PET stub: role login smoke', () => {
     });
 
     test('PetAdmin signs in and sees PetMovers', async ({ page, logisticsApp }) => {
-        test.skip(!config.adminUsername || !config.adminPassword, 'Set LOGISTICS_ADMIN_USER_NAME and LOGISTICS_ADMIN_PASSWORD');
+        test.skip(!config.adminUsername || !config.adminPassword, E2E_SKIP.LOGISTICS_ADMIN);
 
         const header = page.getByRole('banner');
         const sider = page.locator('.ant-layout-sider');
@@ -56,7 +54,7 @@ test.describe('PET stub: role login smoke', () => {
     test('PetAccountant signs in and lands on Reports', async ({ page, logisticsApp }) => {
         test.skip(
             !config.accountantUsername || !config.accountantPassword,
-            'Set LOGISTICS_ACCOUNTANT_USER_NAME and LOGISTICS_ACCOUNTANT_PASSWORD'
+            E2E_SKIP.LOGISTICS_ACCOUNTANT
         );
 
         const header = page.getByRole('banner');

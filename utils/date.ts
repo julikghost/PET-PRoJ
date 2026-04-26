@@ -1,6 +1,9 @@
 /**
  * Date utilities for report checks: local calendar day from ISO, current-month ranges (local and UTC)
  * using `E2E_TIME_ZONE` from config.
+ *
+ * Call `getTodayAndTomorrowDays` / `getCurrentMonthRangeDays` (etc.) at **test run time** (inside a test or
+ * `beforeAll`), not at module top level, so long-lived workers or runs across midnight do not use stale days.
  */
 import { addDays, parseISO, format, startOfMonth, endOfMonth } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';

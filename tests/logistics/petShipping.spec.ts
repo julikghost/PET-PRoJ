@@ -1,6 +1,7 @@
 import { config } from '../../config-logistics';
 import { MENU_ITEM } from '../../utils/constants';
 import { getCurrentAndTomorrowDateTimes } from '../../utils/date';
+import { E2E_SKIP, e2eRefs, e2eRoutes } from '../../utils/e2eTestData';
 import { petShipping as petShippingText } from '../../utils/text';
 import { points as pointsText } from '../../utils/text';
 import { expect, test } from '../fixtures/logisticsApp.fixture';
@@ -9,13 +10,10 @@ const { adminUsername, adminPassword } = config;
 
 test.describe('PetShipping', () => {
     test('create pet ship after two points, then update and delete', async ({ page, logisticsApp }) => {
-        test.skip(
-            !adminUsername || !adminPassword,
-            'Set LOGISTICS_ADMIN_USER_NAME and LOGISTICS_ADMIN_PASSWORD (PetMover precondition + Points/PetShipping).'
-        );
+        test.skip(!adminUsername || !adminPassword, E2E_SKIP.LOGISTICS_ADMIN_PET_SHIPPING);
 
         const ts = Date.now();
-        const shipRef = `E2E-PS-${ts}`;
+        const shipRef = e2eRefs.petShip(ts);
         const { currentDateTime, tomorrowDateTime } = getCurrentAndTomorrowDateTimes();
         const departure = currentDateTime;
         const arrival = tomorrowDateTime;
@@ -38,8 +36,8 @@ test.describe('PetShipping', () => {
             await logisticsApp.navigationSidebar.clickMenuItem(MENU_ITEM.POINTS);
             const routes = await logisticsApp.points.createTwoDistinctPointsForRoutes({
                 suffix: String(ts),
-                from: { name: 'E2E Alpha', city: 'Amsterdam', kindLabel: pointsText.kindHub },
-                to: { name: 'E2E Beta', city: 'Zurich', kindLabel: pointsText.kindHub },
+                from: { ...e2eRoutes.petShipping.from, kindLabel: pointsText.kindHub },
+                to: { ...e2eRoutes.petShipping.to, kindLabel: pointsText.kindHub },
             });
             codeFrom = routes.codeFrom;
             codeTo = routes.codeTo;
@@ -59,7 +57,7 @@ test.describe('PetShipping', () => {
             });
 
             await ship.expectRowContains(shipRef);
-            await ship.expectRowContains('E2E Alpha');
+            await ship.expectRowContains(e2eRoutes.petShipping.from.name);
 
             await ship.clickEdit(shipRef);
             await ship.fillForm({
