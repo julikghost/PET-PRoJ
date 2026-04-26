@@ -36,6 +36,14 @@ export const MENU_ITEM = {
         name: menu.points,
         route: 'points',
     },
+    OUR_CLIENTS: {
+        name: menu.ourClients,
+        route: 'our-clients',
+    },
+    EUROPE_SHOWS: {
+        name: menu.europeShows,
+        route: 'europe-shows',
+    },
 };
 
 /** Matches `pet-app` ReportsPage `data-testid` — stable anchors for FormFields / E2E. */

@@ -17,6 +17,8 @@ import { PointsPage } from './pages/PointsPage';
 import { DashboardHome } from './pages/DashboardHome';
 import { DogDaycarePage } from './pages/DogDaycarePage';
 import { PetSeatersPage } from './pages/PetSeatersPage';
+import { EuropeShowsPage } from './pages/EuropeShowsPage';
+import { OurClientsPage } from './pages/OurClientsPage';
 
 function useAuthed (): boolean {
     return getAuthSession() != null;
@@ -133,6 +135,22 @@ export function App (): JSX.Element {
                 element={
                     <OperationalShell>
                         <PointsPage />
+                    </OperationalShell>
+                }
+            />
+            <Route
+                path="/our-clients"
+                element={
+                    <OperationalShell>
+                        <OurClientsPage />
+                    </OperationalShell>
+                }
+            />
+            <Route
+                path="/europe-shows"
+                element={
+                    <OperationalShell>
+                        <EuropeShowsPage />
                     </OperationalShell>
                 }
             />

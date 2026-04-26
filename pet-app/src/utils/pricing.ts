@@ -5,8 +5,11 @@ import type { PetShipCurrency } from '../types/petLogistics';
 dayjs.extend(customParseFormat);
 
 const DATETIME_FMT = 'YYYY-MM-DD HH:mm';
-const DOG_DAYCARE_MIN_HOURS = 1;
-const DOG_DAYCARE_MAX_HOURS = 12;
+const DATE_FMT = 'YYYY-MM-DD';
+const DOG_DAYCARE_DEFAULT_HOURS = 4;
+
+export const DOG_DAYCARE_HOURS_PER_DAY_OPTIONS = [2, 4, 6, 8, 12] as const;
+export type DogDaycareHoursPerDay = (typeof DOG_DAYCARE_HOURS_PER_DAY_OPTIONS)[number];
 
 /** Per kg per day (booking price = weightKg × rate × tripDays). */
 export const BASE_RATE: Record<PetShipCurrency, number> = {
@@ -14,50 +17,56 @@ export const BASE_RATE: Record<PetShipCurrency, number> = {
     USD: 0.02,
 };
 
-/** Dog daycare hourly rates by size class. */
-export const DOG_DAYCARE_RATE: Record<PetShipCurrency, Record<DogDaycareSize, number>> = {
-    EUR: {
-        small: 0.5,
-        medium: 0.75,
-        large: 1,
-    },
-    USD: {
-        small: 0.7,
-        medium: 1,
-        large: 1.3,
-    },
+/** Daycare hourly tariff: 1 unit (EUR/USD) per hour. */
+export const DOG_DAYCARE_HOURLY_RATE: Record<PetShipCurrency, number> = {
+    EUR: 1,
+    USD: 1,
 };
-
-export type DogDaycareSize = 'small' | 'medium' | 'large';
 
 function roundCurrency (value: number): number {
     return Math.round(value * 100) / 100;
 }
 
-export function dogDaycareSizeByWeight (weightKg: number): DogDaycareSize {
-    if (weightKg <= 10) {
-        return 'small';
+export function normalizeDogDaycareHoursPerDay (hours: number): DogDaycareHoursPerDay {
+    const rounded = Number.isFinite(hours) ? Math.round(hours) : DOG_DAYCARE_DEFAULT_HOURS;
+    const exactMatch = DOG_DAYCARE_HOURS_PER_DAY_OPTIONS.find((x) => x === rounded);
+    if (exactMatch !== undefined) {
+        return exactMatch;
     }
-    if (weightKg <= 25) {
-        return 'medium';
-    }
+    const nearest = [...DOG_DAYCARE_HOURS_PER_DAY_OPTIONS]
+        .sort((a, b) => Math.abs(a - rounded) - Math.abs(b - rounded))[0];
 
-    return 'large';
+    return nearest ?? DOG_DAYCARE_DEFAULT_HOURS;
 }
 
-export function normalizeDogDaycareHours (hours: number): number {
-    if (!Number.isFinite(hours)) {
-        return DOG_DAYCARE_MIN_HOURS;
+export function computeDogDaycareDays (startDate: string, endDate: string): number {
+    const start = dayjs(startDate.trim(), DATE_FMT, true);
+    const end = dayjs(endDate.trim(), DATE_FMT, true);
+    if (!start.isValid() || !end.isValid()) {
+        return 1;
     }
-    const rounded = Math.round(hours);
+    if (end.isBefore(start, 'day')) {
+        return 1;
+    }
 
-    return Math.max(DOG_DAYCARE_MIN_HOURS, Math.min(DOG_DAYCARE_MAX_HOURS, rounded));
+    return end.diff(start, 'day') + 1;
 }
 
-export function dogDaycareHourlyRate (currency: PetShipCurrency, weightKg: number): number {
-    const size = dogDaycareSizeByWeight(weightKg);
+export function computeDogDaycarePrice (
+    currency: PetShipCurrency,
+    requestedHoursPerDay: number,
+    startDate: string,
+    endDate: string
+): number {
+    const hoursPerDay = normalizeDogDaycareHoursPerDay(requestedHoursPerDay);
+    const days = computeDogDaycareDays(startDate, endDate);
+    const hourly = DOG_DAYCARE_HOURLY_RATE[currency];
 
-    return DOG_DAYCARE_RATE[currency][size];
+    return roundCurrency(hourly * hoursPerDay * days);
+}
+
+export function computeBookingTotalPrice (basePrice: number, daycarePrice: number): number {
+    return roundCurrency(basePrice + daycarePrice);
 }
 
 /**
@@ -88,19 +97,4 @@ export function computeBookingPrice (
     const raw = weightKg * rate * days;
 
     return roundCurrency(raw);
-}
-
-export function computeDogDaycarePrice (
-    weightKg: number,
-    currency: PetShipCurrency,
-    requestedHours: number
-): number {
-    const hours = normalizeDogDaycareHours(requestedHours);
-    const hourly = dogDaycareHourlyRate(currency, weightKg);
-
-    return roundCurrency(hourly * hours);
-}
-
-export function computeBookingTotalPrice (basePrice: number, daycarePrice: number): number {
-    return roundCurrency(basePrice + daycarePrice);
 }
