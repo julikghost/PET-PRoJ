@@ -13,7 +13,7 @@ export class NavigationSidebar {
 
     async clickMenuItem ({ name, route }: { name: string; route: string }): Promise<void> {
         await test.step(`Open sidebar section: ${route}`, async () => {
-            const menuItem = this.page.locator('.ant-menu-item').filter({ hasText: name });
+            const menuItem = this.page.getByRole('menuitem', { name, exact: true });
             const urlPattern =
                 route === 'home'
                     ? /\/home(\/|\?|$)/
@@ -21,6 +21,7 @@ export class NavigationSidebar {
 
             await menuItem.click();
             await expect(this.page).toHaveURL(urlPattern);
+            // Selection styling is Ant-specific; locating the item uses role + name (above).
             await expect(menuItem).toHaveClass(/ant-menu-item-selected/);
         });
     }

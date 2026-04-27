@@ -67,6 +67,8 @@ export function ReportsPage (): JSX.Element {
                     name="petMover"
                     label={LABELS.petMover}
                     rules={[{ required: true, message: 'Select a PetMover' }]}
+                    /** Stable E2E anchor (Ant `Select` may not surface `data-testid` on the same node in all versions). */
+                    data-testid="pet-reports-pet-mover-field"
                 >
                     <Select
                         showSearch

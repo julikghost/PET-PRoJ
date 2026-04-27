@@ -28,11 +28,13 @@ export function AppLayout ({ children }: { children: ReactNode }): JSX.Element {
             { key: 'dog-daycare', label: 'Dog Daycare' },
             { key: 'pet-seaters', label: 'Pet Seaters' },
             { key: 'points', label: 'Points' },
+            { key: 'our-clients', label: 'Our Clients' },
         ];
         if (admin) {
             items.push({ key: 'pet-movers', label: 'PetMovers' });
             items.push({ key: 'reports', label: 'Reports' });
         }
+        items.push({ key: 'europe-shows', label: 'Europe Shows' });
         return items;
     }, [admin, accountant]);
 
@@ -65,6 +67,12 @@ export function AppLayout ({ children }: { children: ReactNode }): JSX.Element {
         if (path.startsWith('/points')) {
             return ['points'];
         }
+        if (path.startsWith('/europe-shows')) {
+            return ['europe-shows'];
+        }
+        if (path.startsWith('/our-clients')) {
+            return ['our-clients'];
+        }
         return [];
     }, [location.pathname]);
 
@@ -96,6 +104,8 @@ export function AppLayout ({ children }: { children: ReactNode }): JSX.Element {
                             points: '/points',
                             'pet-movers': '/pet-movers',
                             reports: '/reports',
+                            'europe-shows': '/europe-shows',
+                            'our-clients': '/our-clients',
                         };
                         const to = routes[key];
                         if (to) {

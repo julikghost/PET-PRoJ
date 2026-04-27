@@ -13,11 +13,15 @@ ARG VITE_PET_USER=pet@example.com
 ARG VITE_PET_PASSWORD=pet-secret
 ARG VITE_PET_ADMIN_USER=pet-admin@example.com
 ARG VITE_PET_ADMIN_PASSWORD=pet-admin-secret
+ARG VITE_PET_ACCOUNTANT_USER=pet-accountant@example.com
+ARG VITE_PET_ACCOUNTANT_PASSWORD=pet-accountant-secret
 
 ENV VITE_PET_USER=$VITE_PET_USER
 ENV VITE_PET_PASSWORD=$VITE_PET_PASSWORD
 ENV VITE_PET_ADMIN_USER=$VITE_PET_ADMIN_USER
 ENV VITE_PET_ADMIN_PASSWORD=$VITE_PET_ADMIN_PASSWORD
+ENV VITE_PET_ACCOUNTANT_USER=$VITE_PET_ACCOUNTANT_USER
+ENV VITE_PET_ACCOUNTANT_PASSWORD=$VITE_PET_ACCOUNTANT_PASSWORD
 
 RUN npm run build
 
@@ -27,16 +31,16 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# Reuse the build stage `node_modules` (includes `vite` from devDependencies) — avoids a second
+# `npm ci --include=dev`, which is slow and often hits CI timeouts.
+COPY --from=build /app/node_modules ./node_modules
 
 COPY vite.config.ts vite-plugin-pet-api.ts index.html tsconfig.json ./
-COPY src ./src
-COPY public ./public
 COPY --from=build /app/dist ./dist
 
 EXPOSE 5173
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD node -e "require('http').get('http://127.0.0.1:5173/',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD node -e "require('http').get('http://127.0.0.1:5173/login',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
 CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "5173"]

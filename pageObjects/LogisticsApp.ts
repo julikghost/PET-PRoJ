@@ -5,14 +5,19 @@ import { randomUUID } from 'node:crypto';
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { config } from '../config-logistics';
+import { openPetStubLoginPage } from '../utils/petStubLoginPage';
 import { MENU_ITEM } from '../utils/constants';
 import { Login } from './Login';
 import { Reports } from './Reports';
 import { PetMovers } from './PetMovers';
 import { PetShipping } from './PetShipping';
 import { Booking } from './Booking';
+import { DogDaycare } from './DogDaycare';
 import { Points } from './Points';
 import { NavigationSidebar } from './NavigationSidebar';
+
+/** Docker runners are slower; PET stub navigation after submit needs more slack than local dev. */
+const PET_POST_LOGIN_ASSERT_MS = process.env.E2E_DOCKER === '1' ? 45_000 : 20_000;
 
 export class LogisticsApp {
     readonly page: Page;
@@ -21,6 +26,7 @@ export class LogisticsApp {
     readonly petMovers: PetMovers;
     readonly petShipping: PetShipping;
     readonly booking: Booking;
+    readonly dogDaycare: DogDaycare;
     readonly points: Points;
     readonly navigationSidebar: NavigationSidebar;
 
@@ -31,6 +37,7 @@ export class LogisticsApp {
         this.petMovers = new PetMovers(page);
         this.petShipping = new PetShipping(page);
         this.booking = new Booking(page);
+        this.dogDaycare = new DogDaycare(page);
         this.points = new Points(page);
         this.navigationSidebar = new NavigationSidebar(page);
     }
@@ -65,13 +72,9 @@ export class LogisticsApp {
                     'LOGISTICS_ADMIN_USER_NAME and LOGISTICS_ADMIN_PASSWORD must be set for PetAdmin flows.'
                 );
             }
-            await this.page.goto('/');
-            await this.page.evaluate(() => {
-                localStorage.removeItem('pet-auth');
-            });
-            await this.page.goto('/login');
+            await openPetStubLoginPage(this.page, config.baseUrl);
             await this.login.signInPetApp(adminUsername, adminPassword);
-            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: 20000 });
+            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: PET_POST_LOGIN_ASSERT_MS });
         });
     }
 
@@ -86,13 +89,9 @@ export class LogisticsApp {
                     'LOGISTICS_UI_USER_NAME (or LOGISTICS_E2E_USER_NAME) and LOGISTICS_PASSWORD must be set.'
                 );
             }
-            await this.page.goto('/');
-            await this.page.evaluate(() => {
-                localStorage.removeItem('pet-auth');
-            });
-            await this.page.goto('/login');
+            await openPetStubLoginPage(this.page, config.baseUrl);
             await this.login.signInPetApp(uiUsername, password);
-            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: 20000 });
+            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: PET_POST_LOGIN_ASSERT_MS });
         });
     }
 
@@ -136,20 +135,29 @@ export class LogisticsApp {
     }
 
     /**
-     * Best-effort cleanup after E2E (order: booking → pet ship → points → pet mover).
+     * Best-effort cleanup after E2E (order: booking → pet ship → points → dog daycare → pet movers).
      * Ignores missing rows / errors so `finally` stays safe.
      */
     async teardownPetE2eData (opts: {
         bookingRef?: string;
         petShipRef?: string;
         pointCodes?: string[];
+        /** Dog Daycare row ref (`daycare-delete-<ref>`). */
+        dogDaycareRef?: string;
         /** Delete one PetMover by code (legacy). */
         petMoverCode?: string;
         /** Delete several PetMovers by code. */
         petMoverCodes?: string[];
     }): Promise<void> {
-        await test.step('Teardown: E2E booking / pet ship / points / pet mover', async () => {
-            const { bookingRef, petShipRef, pointCodes = [], petMoverCode, petMoverCodes = [] } = opts;
+        await test.step('Teardown: E2E booking / pet ship / points / dog daycare / pet mover', async () => {
+            const {
+                bookingRef,
+                petShipRef,
+                pointCodes = [],
+                dogDaycareRef,
+                petMoverCode,
+                petMoverCodes = [],
+            } = opts;
             if (bookingRef) {
                 try {
                     await this.navigationSidebar.clickMenuItem(MENU_ITEM.BOOKING);
@@ -189,6 +197,19 @@ export class LogisticsApp {
                     /* ignore */
                 }
             }
+            if (dogDaycareRef) {
+                try {
+                    await this.navigationSidebar.clickMenuItem(MENU_ITEM.DOG_DAYCARE);
+                    await this.dogDaycare.expectLoaded();
+                    const del = this.page.getByTestId(`daycare-delete-${dogDaycareRef}`);
+                    if (await del.isVisible().catch(() => false)) {
+                        await this.dogDaycare.clickDelete(dogDaycareRef);
+                        await this.dogDaycare.confirmDeleteInDialog();
+                    }
+                } catch {
+                    /* ignore */
+                }
+            }
             const moverCodes = [...new Set([...petMoverCodes, ...(petMoverCode ? [petMoverCode] : [])])];
             for (const code of moverCodes) {
                 try {
@@ -211,13 +232,9 @@ export class LogisticsApp {
                     'LOGISTICS_ACCOUNTANT_USER_NAME and LOGISTICS_ACCOUNTANT_PASSWORD must be set for PetAccountant flows.'
                 );
             }
-            await this.page.goto('/');
-            await this.page.evaluate(() => {
-                localStorage.removeItem('pet-auth');
-            });
-            await this.page.goto('/login');
+            await openPetStubLoginPage(this.page, config.baseUrl);
             await this.login.signInPetApp(accountantUsername, accountantPassword);
-            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: 20000 });
+            await expect(this.page).not.toHaveURL(/\/login$/, { timeout: PET_POST_LOGIN_ASSERT_MS });
         });
     }
 

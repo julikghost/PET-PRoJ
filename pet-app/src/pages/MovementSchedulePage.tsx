@@ -292,7 +292,8 @@ export function MovementSchedulePage (): JSX.Element {
             </Space>
             <p style={{ marginBottom: 16, color: petTheme.textMuted }}>
                 Define routes between points. Booking uses planned or active pet ships only. Trips appear in the
-                calendar by departure date (add them with the button above).
+                calendar by departure date (add them with the button above). A pet ship is allowed only if departure and
+                arrival fall on the same calendar day and the trip lasts more than 30 minutes.
             </p>
             <div data-testid="schedule-calendar" style={{ marginBottom: 24 }}>
                 <Calendar fullscreen={false} cellRender={calendarCellRender} />

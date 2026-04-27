@@ -1,0 +1,17 @@
+# Загрузка образа PET UI для Playwright E2E (GHCR после «Docker Image CI» или сборка на PR).
+name: Load PET UI image for E2E
+description: Pull ghcr.io/<repo>/pet-app or docker compose build on pull_request.
+
+inputs:
+  github-token:
+    description: PAT для docker login ghcr.io (обычно secrets.GITHUB_TOKEN)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve image
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: bash "${GITHUB_WORKSPACE}/.github/scripts/ci/pet-app-image.sh"

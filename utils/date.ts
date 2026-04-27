@@ -1,6 +1,9 @@
 /**
  * Date utilities for report checks: local calendar day from ISO, current-month ranges (local and UTC)
  * using `E2E_TIME_ZONE` from config.
+ *
+ * Call `getTodayAndTomorrowDays` / `getCurrentMonthRangeDays` (etc.) at **test run time** (inside a test or
+ * `beforeAll`), not at module top level, so long-lived workers or runs across midnight do not use stale days.
  */
 import { addDays, parseISO, format, startOfMonth, endOfMonth } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
@@ -27,6 +30,33 @@ export function getTodayAndTomorrowDays (timeZone: string = config.timeZone || d
         return {
             todayDay: format(today, 'yyyy-MM-dd'),
             tomorrowDay: format(tomorrow, 'yyyy-MM-dd'),
+        };
+    }
+}
+
+/**
+ * PetShipping rule: same calendar day and trip longer than 30 minutes — use for E2E ship creation.
+ */
+export function getSameDayPetShipDateTimes (timeZone: string = config.timeZone || defaultTimeZone): {
+    departure: string;
+    arrival: string;
+} {
+    try {
+        const zoned = toZonedTime(new Date(), timeZone);
+        const dateStr = format(zoned, 'yyyy-MM-dd');
+
+        return {
+            departure: `${dateStr} 10:00`,
+            arrival: `${dateStr} 12:00`,
+        };
+    } catch {
+        const d = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+        return {
+            departure: `${dateStr} 10:00`,
+            arrival: `${dateStr} 12:00`,
         };
     }
 }

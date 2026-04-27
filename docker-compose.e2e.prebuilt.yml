@@ -1,0 +1,6 @@
+# Overlay: использовать уже собранный образ PET UI из GHCR (см. `.github/workflows/docker-image.yml`).
+# Запуск: задать `PET_APP_IMAGE` и подключить второй файл:
+#   PET_APP_IMAGE=ghcr.io/<owner>/<repo>/pet-app:latest docker compose -f docker-compose.e2e.yml -f docker-compose.e2e.prebuilt.yml up …
+services:
+  pet-app:
+    image: ${PET_APP_IMAGE}
