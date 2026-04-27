@@ -9,7 +9,14 @@ The app is intentionally test-friendly: role-based login, stable `data-testid` s
 
 ## What the PET app includes
 
-- **Operational modules**: Points, Pet Shipping (movement schedule), Booking, Dog Daycare.
+- **Operational modules**:
+  - Points
+  - Pet Shipping (movement schedule)
+  - Booking (with required client first/last name)
+  - Dog Daycare (separate flow, also stores client first/last name)
+  - Pet Seaters
+  - Our Clients (aggregated table from Booking + Dog Daycare)
+  - Europe Shows (external links and preview cards)
 - **Admin module**: Pet Movers directory.
 - **Reports module**: email report flow through GraphQL endpoint.
 - **Roles**:
@@ -17,14 +24,14 @@ The app is intentionally test-friendly: role-based login, stable `data-testid` s
   - `PetAdmin`: operational pages + Pet Movers + Reports.
   - `PetAccountant`: Reports only.
 - **Storage model**:
-  - `pet-logistics-v1` for points, pet ships, bookings.
+  - `pet-logistics-v1` for points, pet ships, bookings, dog daycares, pet seaters.
   - `pet-movers-v1` for pet movers.
 
 GraphQL contract lives in `pet-app/graphql/schema.graphql`. The dev server uses a lightweight stub (not a full GraphQL runtime) to support E2E checks.
 
 ## Project structure
 
-- `pet-app/src/pages/`: UI pages (`PointsPage`, `MovementSchedulePage`, `BookingPage`, `PetMoversPage`, `ReportsPage`).
+- `pet-app/src/pages/`: UI pages (`PointsPage`, `MovementSchedulePage`, `BookingPage`, `DogDaycarePage`, `PetSeatersPage`, `OurClientsPage`, `EuropeShowsPage`, `PetMoversPage`, `ReportsPage`).
 - `pet-app/src/context/PetLogisticsContext.tsx`: local storage state, CRUD rules, cross-entity validations.
 - `pageObjects/`: Playwright page objects used by tests.
 - `tests/auth/`: session bootstrap project.

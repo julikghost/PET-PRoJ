@@ -2,7 +2,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { test as setup, expect } from '@playwright/test';
 import { config, storageStatePath } from '../../config-logistics';
-import { getAccessToken } from '../../utils/helper';
+import { assertPetStorageStateHasPetAuth, getAccessToken } from '../../utils/helper';
+import { openPetStubLoginPage } from '../../utils/petStubLoginPage';
+import { usePetStubLoginFlow } from '../../utils/petStubLoginFlow';
 import { LogisticsApp } from '../../pageObjects/LogisticsApp';
 
 /** PET: `/home` (ops) or `/reports` (accountant); OIDC clients often stay on `/`. */
@@ -20,25 +22,24 @@ const offlineScopeCheckbox =
     || process.env.E2E_OIDC_OFFLINE_CHECKBOX?.trim()
     || 'offline_access';
 
-/** PET dev server + `.env.example` use `identifier`; skip slow OIDC-only steps unless consent UI is configured. */
-function usePetStubLoginFlow (): boolean {
-    if (process.env.E2E_HOSTED_LOGISTICS_LOGIN === '1') {
-        return false;
-    }
-    const idField = process.env.E2E_LOGIN_USER_FIELD_NAME?.trim();
-    if (idField !== 'identifier') {
-        return false;
-    }
-    const base = config.baseUrl.trim().toLowerCase();
-    return base.includes('localhost') || base.includes('127.0.0.1');
-}
-
 setup('Persist logistics web session storage', async ({ page }) => {
     const app = new LogisticsApp(page);
 
     if (usePetStubLoginFlow()) {
-        const loginUrl = new URL('login', `${baseUrl.trim().replace(/\/?$/, '/')}`).href;
-        await page.goto(loginUrl);
+        if (!baseUrl?.trim()) {
+            throw new Error(
+                'LOGISTICS_BASE_CLIENT_URL is empty — set it (e.g. http://pet-app:5173/ in Docker Compose).'
+            );
+        }
+        if (!uiUsername?.trim() || !password?.trim()) {
+            throw new Error(
+                'PET stub login needs LOGISTICS_UI_USER_NAME and LOGISTICS_PASSWORD in repo-root `.env` '
+                + '(copy from `.env.example`). If `.env` was copied from an older broken example, '
+                + 'ensure `LOGISTICS_BASE_API_URL` and `LOGISTICS_UI_USER_NAME` are on separate lines.'
+            );
+        }
+        await openPetStubLoginPage(page, baseUrl);
+
         await app.login.signInPetApp(uiUsername, password);
     } else {
         await app.openLogisticsApp();
@@ -58,8 +59,21 @@ setup('Persist logistics web session storage', async ({ page }) => {
 
     await expect(page).toHaveURL(postLoginClientUrlRegex(baseUrl));
 
+    /** PET auth lives in `localStorage`; ensure it exists before `storageState()` or the file can be empty origins. */
+    await page.waitForFunction(
+        () => {
+            try {
+                return Boolean(localStorage.getItem('pet-auth'));
+            } catch {
+                return false;
+            }
+        },
+        { timeout: 20_000 }
+    );
+
     fs.mkdirSync(path.dirname(storageStatePath), { recursive: true });
     await page.context().storageState({ path: storageStatePath });
+    assertPetStorageStateHasPetAuth(storageStatePath);
 
     const accessToken = await getAccessToken(storageStatePath);
     process.env.E2E_SESSION_ACCESS_TOKEN = accessToken;

@@ -1,0 +1,84 @@
+# PET UI + Playwright E2E in Docker (CI / local parity).
+# CI (GitHub): workflow `pet-docker-ci.yml` (build+push GHCR → pull → compose); локально см. `.github/scripts/ci/pet-app-image.sh`.
+# From repo root:
+#   docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
+#
+# Postgres + API gate + UI + E2E (порядок готовности: БД → бэк → фронт → тесты): `docker-compose.stack.yml` или `npm run docker:e2e:stack`.
+#
+# Один файл (опционально): E2E_PLAYWRIGHT_SPEC=tests/logistics/booking.spec.ts docker compose … up …
+#
+# Compose reads the repo-root `.env` for ${VAR:-default} substitution (same names as local E2E).
+# Inside the stack, URLs must target `pet-app`, not `localhost`.
+#
+# PET stub auth: passwords are embedded at image build (`npm run build`). Build args mirror `LOGISTICS_*` below.
+# If login fails after editing `.env`, rebuild: `docker compose -f docker-compose.e2e.yml build --no-cache pet-app`
+# (or `up --build`). Using a cached `pet-app` image with old `VITE_PET_*` causes “wrong password” while E2E sends new creds.
+services:
+  pet-app:
+    build:
+      context: ./pet-app
+      dockerfile: Dockerfile
+      args:
+        VITE_PET_USER: ${LOGISTICS_UI_USER_NAME:-pet@example.com}
+        VITE_PET_PASSWORD: ${LOGISTICS_PASSWORD:-pet-secret}
+        VITE_PET_ADMIN_USER: ${LOGISTICS_ADMIN_USER_NAME:-pet-admin@example.com}
+        VITE_PET_ADMIN_PASSWORD: ${LOGISTICS_ADMIN_PASSWORD:-pet-admin-secret}
+        VITE_PET_ACCOUNTANT_USER: ${LOGISTICS_ACCOUNTANT_USER_NAME:-pet-accountant@example.com}
+        VITE_PET_ACCOUNTANT_PASSWORD: ${LOGISTICS_ACCOUNTANT_PASSWORD:-pet-accountant-secret}
+    expose:
+      - "5173"
+    # `/login` ensures SPA fallback runs (same as Playwright); `/` alone can be 200 before preview is fully ready on slow CI runners.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:5173/login',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 18
+      start_period: 50s
+
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.57.0-noble
+    user: root
+    init: true
+    # Default Docker /dev/shm (64MB) is too small for headless Chromium + Vite bundle; #root stays empty without this.
+    shm_size: '2gb'
+    # Chromium with `--disable-dev-shm-usage` spills to /tmp; a generous tmpfs avoids host /tmp exhaustion (Docker Desktop).
+    tmpfs:
+      - /tmp:size=1g,exec
+    depends_on:
+      pet-app:
+        condition: service_healthy
+    working_dir: /work
+    volumes:
+      - .:/work
+    environment:
+      LOGISTICS_BASE_CLIENT_URL: http://pet-app:5173/
+      LOGISTICS_BASE_API_URL: http://pet-app:5173/api
+      LOGISTICS_UI_USER_NAME: ${LOGISTICS_UI_USER_NAME:-pet@example.com}
+      LOGISTICS_PASSWORD: ${LOGISTICS_PASSWORD:-pet-secret}
+      LOGISTICS_ADMIN_USER_NAME: ${LOGISTICS_ADMIN_USER_NAME:-pet-admin@example.com}
+      LOGISTICS_ADMIN_PASSWORD: ${LOGISTICS_ADMIN_PASSWORD:-pet-admin-secret}
+      LOGISTICS_ACCOUNTANT_USER_NAME: ${LOGISTICS_ACCOUNTANT_USER_NAME:-pet-accountant@example.com}
+      LOGISTICS_ACCOUNTANT_PASSWORD: ${LOGISTICS_ACCOUNTANT_PASSWORD:-pet-accountant-secret}
+      E2E_LOGIN_USER_FIELD_NAME: ${E2E_LOGIN_USER_FIELD_NAME:-identifier}
+      E2E_TIME_ZONE: ${E2E_TIME_ZONE:-UTC}
+      E2E_PET_STUB_LOGIN: "1"
+      E2E_DOCKER: "1"
+      CI: "true"
+      # Written by project `logistics_session`; override path via `E2E_STORAGE_STATE_PATH`.
+      E2E_STORAGE_STATE_PATH: ${E2E_STORAGE_STATE_PATH:-storageState/session.json}
+      # Parallelism inside the e2e container (CLI `--workers`; overrides playwright.config.ts).
+      E2E_PLAYWRIGHT_WORKERS: ${E2E_PLAYWRIGHT_WORKERS:-4}
+      # Host may set this (e.g. CI matrix); empty = full suite. Passed into the container for the shell below.
+      E2E_PLAYWRIGHT_SPEC: ${E2E_PLAYWRIGHT_SPEC:-}
+      # CI matrix: один spec после prep (`logistics_session`); см. `E2E_WEB_NO_DEPS`.
+      E2E_WEB_NO_DEPS: ${E2E_WEB_NO_DEPS:-}
+    # Script avoids Compose `$…` interpolation eating the runtime `E2E_PLAYWRIGHT_SPEC` from the container env.
+    command:
+      - bash
+      - /work/scripts/docker-e2e-run.sh

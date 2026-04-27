@@ -7,6 +7,8 @@ import {
     useState,
     type ReactNode,
 } from 'react';
+import dayjs from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
 import { toast } from '../petToast';
 import type {
     BookingBillingCurrency,
@@ -25,6 +27,8 @@ import {
     normalizeDogDaycareHours,
     petShipScheduleValidationMessage,
 } from '../utils/pricing';
+
+dayjs.extend(customParseFormat);
 
 export const PET_LOGISTICS_STORAGE_KEY = 'pet-logistics-v1';
 
@@ -50,6 +54,8 @@ const emptyState = (): StoreState => ({
     dogDaycares: [],
     petSeaters: [],
 });
+
+const DAYCARE_DATE_FMT = 'YYYY-MM-DD';
 
 function normalizePetShip (raw: unknown): PetShipRecord | null {
     if (raw === null || typeof raw !== 'object') {
@@ -114,6 +120,31 @@ function normalizeDogDaycareStatus (raw: unknown): DogDaycareStatus {
     return 'scheduled';
 }
 
+function normalizeDogAge (yearsRaw: unknown, monthsRaw: unknown): { ageYears: number; ageMonths: number } {
+    let ageYears = typeof yearsRaw === 'number' && Number.isFinite(yearsRaw)
+        ? Math.max(0, Math.floor(yearsRaw))
+        : 0;
+    let ageMonths = typeof monthsRaw === 'number' && Number.isFinite(monthsRaw)
+        ? Math.max(0, Math.floor(monthsRaw))
+        : 0;
+    if (ageMonths >= 12) {
+        ageYears += Math.floor(ageMonths / 12);
+        ageMonths = ageMonths % 12;
+    }
+    let totalMonths = ageYears * 12 + ageMonths;
+    if (totalMonths < 5) {
+        totalMonths = 5;
+    }
+    if (totalMonths > 12 * 12) {
+        totalMonths = 12 * 12;
+    }
+
+    return {
+        ageYears: Math.floor(totalMonths / 12),
+        ageMonths: totalMonths % 12,
+    };
+}
+
 function normalizeBooking (raw: unknown, petShips: PetShipRecord[]): BookingRecord | null {
     if (raw === null || typeof raw !== 'object') {
         return null;
@@ -149,12 +180,16 @@ function normalizeBooking (raw: unknown, petShips: PetShipRecord[]): BookingReco
         : b.billingCurrency === 'cur-usd' || b.billingCurrency === 'cur-eur'
             ? b.billingCurrency
             : 'cur-eur';
+    const clientFirstName = typeof b.clientFirstName === 'string' ? b.clientFirstName.trim() : '';
+    const clientLastName = typeof b.clientLastName === 'string' ? b.clientLastName.trim() : '';
 
     return {
         id: b.id,
         refCode: b.refCode,
         petShipId: b.petShipId,
         date: b.date,
+        clientFirstName,
+        clientLastName,
         petLabels,
         weightKg: b.weightKg,
         price,
@@ -187,29 +222,40 @@ function normalizeDogDaycare (raw: unknown, petSeaters: PetSeaterRecord[]): DogD
         return null;
     }
     const d = raw as Record<string, unknown>;
-    if (typeof d.id !== 'string' || typeof d.refCode !== 'string' || typeof d.hours !== 'number') {
+    if (typeof d.id !== 'string' || typeof d.refCode !== 'string') {
         return null;
     }
+    const today = dayjs().format('YYYY-MM-DD');
     const bookingRefCode = typeof d.bookingRefCode === 'string'
         ? d.bookingRefCode.trim()
         : typeof d.bookingId === 'string'
             ? d.bookingId.trim()
             : '';
-    const bookingDate = typeof d.bookingDate === 'string'
-        ? d.bookingDate.trim()
-        : typeof d.date === 'string'
-            ? d.date.trim()
-            : '';
+    const startDate = typeof d.startDate === 'string' && d.startDate.trim()
+        ? d.startDate.trim()
+        : typeof d.bookingDate === 'string' && d.bookingDate.trim()
+            ? d.bookingDate.trim()
+            : typeof d.date === 'string' && d.date.trim()
+                ? d.date.trim()
+                : today;
+    const endDate = typeof d.endDate === 'string' && d.endDate.trim() ? d.endDate.trim() : startDate;
+    const clientFirstName = typeof d.clientFirstName === 'string' ? d.clientFirstName.trim() : '';
+    const clientLastName = typeof d.clientLastName === 'string' ? d.clientLastName.trim() : '';
     const dogName = typeof d.dogName === 'string' && d.dogName.trim() ? d.dogName.trim() : 'Dog';
-    const dogWeightKg = typeof d.dogWeightKg === 'number' && Number.isFinite(d.dogWeightKg)
-        ? d.dogWeightKg
-        : typeof d.weightKg === 'number' && Number.isFinite(d.weightKg)
-            ? d.weightKg
-            : 10;
+    const breed = typeof d.breed === 'string' && d.breed.trim() ? d.breed.trim() : 'Mixed';
+    const { ageYears, ageMonths } = normalizeDogAge(d.ageYears, d.ageMonths);
+    const hoursRaw = typeof d.hoursPerDay === 'number'
+        ? d.hoursPerDay
+        : typeof d.hours === 'number'
+            ? d.hours
+            : 4;
     const currency: PetShipCurrency = d.currency === 'USD' ? 'USD' : 'EUR';
-    const hours = normalizeDogDaycareHours(d.hours);
+    const hoursPerDay = normalizeDogDaycareHoursPerDay(hoursRaw);
     const status = normalizeDogDaycareStatus(d.status);
     const notes = typeof d.notes === 'string' ? d.notes.trim() : '';
+    const petPhotoUrl = typeof d.petPhotoUrl === 'string' && d.petPhotoUrl.trim()
+        ? d.petPhotoUrl
+        : undefined;
     const petSeaterId = typeof d.petSeaterId === 'string' && d.petSeaterId.trim()
         ? d.petSeaterId.trim()
         : undefined;
@@ -219,15 +265,21 @@ function normalizeDogDaycare (raw: unknown, petSeaters: PetSeaterRecord[]): DogD
         id: d.id,
         refCode: d.refCode.trim(),
         bookingRefCode,
-        bookingDate,
+        startDate,
+        endDate,
+        clientFirstName,
+        clientLastName,
         dogName,
-        dogWeightKg,
-        hours,
+        breed,
+        ageYears,
+        ageMonths,
+        hoursPerDay,
         status,
         petSeaterId: petSeater?.id,
+        petPhotoUrl,
         petSeaterName: petSeater?.name ?? '',
         notes,
-        price: computeDogDaycarePrice(dogWeightKg, currency, hours),
+        price: computeDogDaycarePrice(currency, hoursPerDay, startDate, endDate),
         currency,
     };
 }
@@ -513,11 +565,20 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
 
                     return prev;
                 }
+                const clientFirstName = row.clientFirstName.trim();
+                const clientLastName = row.clientLastName.trim();
+                if (!clientFirstName || !clientLastName) {
+                    toast.error('Client first name and last name are required');
+
+                    return prev;
+                }
                 const full: BookingRecord = {
                     id,
                     refCode: row.refCode.trim(),
                     petShipId: row.petShipId,
                     date: row.date,
+                    clientFirstName,
+                    clientLastName,
                     petLabels,
                     weightKg: row.weightKg,
                     price: computeBookingPrice(row.weightKg, ship.currency, ship.departure, ship.arrival),
@@ -650,9 +711,34 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
 
                     return prev;
                 }
-                const bookingDate = row.bookingDate.trim();
-                if (!bookingDate) {
-                    toast.error('Daycare booking date is required');
+                const startDate = row.startDate.trim();
+                if (!startDate) {
+                    toast.error('Start date is required');
+
+                    return prev;
+                }
+                const endDate = row.endDate.trim();
+                if (!endDate) {
+                    toast.error('End date is required');
+
+                    return prev;
+                }
+                const start = dayjs(startDate, DAYCARE_DATE_FMT, true);
+                const end = dayjs(endDate, DAYCARE_DATE_FMT, true);
+                if (!start.isValid() || !end.isValid()) {
+                    toast.error('Start and end dates must have YYYY-MM-DD format');
+
+                    return prev;
+                }
+                if (end.isBefore(start, 'day')) {
+                    toast.error('End date must be equal to or after start date');
+
+                    return prev;
+                }
+                const clientFirstName = row.clientFirstName.trim();
+                const clientLastName = row.clientLastName.trim();
+                if (!clientFirstName || !clientLastName) {
+                    toast.error('Client first name and last name are required');
 
                     return prev;
                 }
@@ -662,12 +748,29 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
 
                     return prev;
                 }
-                const dogWeightKg = Number(row.dogWeightKg);
-                if (!Number.isFinite(dogWeightKg) || dogWeightKg <= 0) {
-                    toast.error('Dog weight must be greater than 0');
+                const breed = row.breed.trim();
+                if (!breed) {
+                    toast.error('Breed is required');
 
                     return prev;
                 }
+                const hasAgeInput =
+                    Number.isFinite(Number(row.ageYears))
+                    || Number.isFinite(Number(row.ageMonths));
+                if (!hasAgeInput) {
+                    toast.error('Provide age in years and/or months');
+
+                    return prev;
+                }
+                const rawYears = Number.isFinite(Number(row.ageYears)) ? Math.floor(Number(row.ageYears)) : 0;
+                const rawMonths = Number.isFinite(Number(row.ageMonths)) ? Math.floor(Number(row.ageMonths)) : 0;
+                const totalAgeMonths = rawYears * 12 + rawMonths;
+                if (totalAgeMonths < 5 || totalAgeMonths > 12 * 12) {
+                    toast.error('Age must be between 5 months and 12 years');
+
+                    return prev;
+                }
+                const { ageYears, ageMonths } = normalizeDogAge(rawYears, rawMonths);
                 const petSeaterId = typeof row.petSeaterId === 'string' && row.petSeaterId.trim()
                     ? row.petSeaterId.trim()
                     : undefined;
@@ -679,22 +782,31 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
 
                     return prev;
                 }
-                const hours = normalizeDogDaycareHours(row.hours);
+                const hoursPerDay = normalizeDogDaycareHoursPerDay(row.hoursPerDay);
                 const status = normalizeDogDaycareStatus(row.status);
                 const currency: PetShipCurrency = row.currency === 'USD' ? 'USD' : 'EUR';
+                const petPhotoUrl = typeof row.petPhotoUrl === 'string' && row.petPhotoUrl.trim()
+                    ? row.petPhotoUrl
+                    : undefined;
                 const full: DogDaycareRecord = {
                     id,
                     refCode,
                     bookingRefCode,
-                    bookingDate,
+                    startDate,
+                    endDate,
+                    clientFirstName,
+                    clientLastName,
                     dogName,
-                    dogWeightKg,
-                    hours,
+                    breed,
+                    ageYears,
+                    ageMonths,
+                    hoursPerDay,
                     status,
                     petSeaterId: petSeater?.id,
+                    petPhotoUrl,
                     petSeaterName: petSeater?.name ?? '',
                     notes: row.notes.trim(),
-                    price: computeDogDaycarePrice(dogWeightKg, currency, hours),
+                    price: computeDogDaycarePrice(currency, hoursPerDay, startDate, endDate),
                     currency,
                 };
                 accepted = true;

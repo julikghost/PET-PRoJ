@@ -25,9 +25,11 @@ export class Points {
 
     /** Prefer over a bare visible dropdown: city and kind portals can overlap during leave/enter animation (strict mode / wrong target). */
     private selectDropdownWithOption (optionName: string): Locator {
-        return this.visibleSelectDropdown().filter({
-            has: this.page.getByRole('option', { name: optionName, exact: true }),
-        });
+        return this.visibleSelectDropdown()
+            .filter({
+                has: this.page.getByRole('option', { name: optionName, exact: true }),
+            })
+            .last();
     }
 
     /** Wait until the open city dropdown portal is gone — avoids Kind click hitting an animating overlay / `ant-modal-wrap` interception. */
@@ -68,9 +70,16 @@ export class Points {
         const citySearch = cityField.locator('input[type="search"]').or(cityField.locator('.ant-select-selection-search-input'));
         await expect(citySearch).toBeVisible({ timeout: 5000 });
         await citySearch.fill(city);
+        /**
+         * Do not use Enter here: in Edit mode, Enter can submit the modal (kind already filled)
+         * and close it before the next step selects Kind.
+         *
+         * Keep the city dropdown open and use keyboard selection inside rc-select itself.
+         * If Enter is sent while the dropdown is closed, Modal can submit in Edit mode.
+         */
         const cityDd = this.selectDropdownWithOption(city);
         await expect(cityDd).toBeVisible({ timeout: 15000 });
-        await cityDd.getByRole('option', { name: city, exact: true }).waitFor({ state: 'attached', timeout: 15000 });
+        await citySearch.press('ArrowDown');
         await citySearch.press('Enter');
         await this.waitUntilOpenDropdownForOptionGone(city);
         // Do not press Escape here — with the overlay closed, Escape can close the whole Modal (no save, no toast).

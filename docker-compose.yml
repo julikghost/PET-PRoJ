@@ -1,9 +1,19 @@
 # PET UI: http://localhost:5173 — point Playwright `LOGISTICS_BASE_CLIENT_URL` here when testing against Docker.
+#
+# Stub login compares the typed password to `VITE_PET_*` baked in at `npm run build`. Keep build args in sync
+# with repo-root `.env` (`LOGISTICS_*`), same as `docker-compose.e2e.yml`. After changing passwords: rebuild the image.
 services:
   pet-app:
     build:
       context: ./pet-app
       dockerfile: Dockerfile
+      args:
+        VITE_PET_USER: ${LOGISTICS_UI_USER_NAME:-pet@example.com}
+        VITE_PET_PASSWORD: ${LOGISTICS_PASSWORD:-pet-secret}
+        VITE_PET_ADMIN_USER: ${LOGISTICS_ADMIN_USER_NAME:-pet-admin@example.com}
+        VITE_PET_ADMIN_PASSWORD: ${LOGISTICS_ADMIN_PASSWORD:-pet-admin-secret}
+        VITE_PET_ACCOUNTANT_USER: ${LOGISTICS_ACCOUNTANT_USER_NAME:-pet-accountant@example.com}
+        VITE_PET_ACCOUNTANT_PASSWORD: ${LOGISTICS_ACCOUNTANT_PASSWORD:-pet-accountant-secret}
     ports:
       - "5173:5173"
     environment:

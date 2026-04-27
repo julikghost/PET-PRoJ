@@ -1,20 +1,31 @@
 import { App, Button, Flex, Form, Input } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { BrandLogo } from '../components/BrandLogo';
 import { BRAND_NAME } from '../brand';
 import { petTheme } from '../theme/palette';
 import { ROLE_PET_ACCOUNTANT, ROLE_PET_ADMIN, ROLE_PET_USER } from '../auth';
 
+/** CI/Docker build-args and GitHub secrets often carry trailing spaces or newlines; E2E config trims the same way. */
+function petStubEnv (v: unknown): string | undefined {
+    if (typeof v !== 'string') {
+        return undefined;
+    }
+    const t = v.trim();
+
+    return t.length > 0 ? t : undefined;
+}
+
 export function LoginPage (): JSX.Element {
     const navigate = useNavigate();
+    const location = useLocation();
     const { message } = App.useApp();
     const [form] = Form.useForm<{ identifier: string; password: string }>();
-    const user = import.meta.env.VITE_PET_USER as string | undefined;
-    const pass = import.meta.env.VITE_PET_PASSWORD as string | undefined;
-    const adminUser = import.meta.env.VITE_PET_ADMIN_USER as string | undefined;
-    const adminPass = import.meta.env.VITE_PET_ADMIN_PASSWORD as string | undefined;
-    const accountantUser = import.meta.env.VITE_PET_ACCOUNTANT_USER as string | undefined;
-    const accountantPass = import.meta.env.VITE_PET_ACCOUNTANT_PASSWORD as string | undefined;
+    const user = petStubEnv(import.meta.env.VITE_PET_USER);
+    const pass = petStubEnv(import.meta.env.VITE_PET_PASSWORD);
+    const adminUser = petStubEnv(import.meta.env.VITE_PET_ADMIN_USER);
+    const adminPass = petStubEnv(import.meta.env.VITE_PET_ADMIN_PASSWORD);
+    const accountantUser = petStubEnv(import.meta.env.VITE_PET_ACCOUNTANT_USER);
+    const accountantPass = petStubEnv(import.meta.env.VITE_PET_ACCOUNTANT_PASSWORD);
 
     const hasDemoCredentials =
         Boolean(user && pass)
@@ -23,7 +34,7 @@ export function LoginPage (): JSX.Element {
 
     const onFinish = (values: { identifier: string; password: string }): void => {
         const identifier = values.identifier.trim();
-        const password = values.password;
+        const password = typeof values.password === 'string' ? values.password.trim() : '';
 
         let role = ROLE_PET_USER;
         if (
@@ -61,7 +72,21 @@ export function LoginPage (): JSX.Element {
                 role,
             })
         );
-        navigate(role === ROLE_PET_ACCOUNTANT ? '/reports' : '/home');
+        const defaultPath = role === ROLE_PET_ACCOUNTANT ? '/reports' : '/home';
+        const fromState = location.state as { from?: { pathname?: string; search?: string } } | null | undefined;
+        const fromPath = fromState?.from?.pathname;
+        const safeReturn =
+            typeof fromPath === 'string'
+            && fromPath !== '/login'
+            && fromPath !== '/'
+            && !fromPath.includes('..');
+        if (safeReturn) {
+            const search = typeof fromState?.from?.search === 'string' ? fromState.from.search : '';
+            navigate(`${fromPath}${search}`, { replace: true });
+
+            return;
+        }
+        navigate(defaultPath, { replace: true });
     };
 
     return (

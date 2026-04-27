@@ -37,6 +37,8 @@ export function BookingPage (): JSX.Element {
         refCode: string;
         petShipId: string;
         date: dayjs.Dayjs;
+        clientFirstName: string;
+        clientLastName: string;
         petLabels: string[];
         weightKg: number;
         paymentMethod: BookingPaymentMethod;
@@ -71,6 +73,8 @@ export function BookingPage (): JSX.Element {
             refCode: '',
             petShipId: undefined,
             date: dayjs().add(1, 'day'),
+            clientFirstName: '',
+            clientLastName: '',
             petLabels: [],
             weightKg: 5,
             paymentMethod: 'card',
@@ -85,6 +89,8 @@ export function BookingPage (): JSX.Element {
                 refCode: record.refCode,
                 petShipId: record.petShipId,
                 date: dayjs(record.date, 'YYYY-MM-DD'),
+                clientFirstName: record.clientFirstName,
+                clientLastName: record.clientLastName,
                 petLabels: record.petLabels,
                 weightKg: record.weightKg,
                 paymentMethod: record.paymentMethod,
@@ -103,6 +109,8 @@ export function BookingPage (): JSX.Element {
                       refCode: v.refCode,
                       petShipId: v.petShipId,
                       date: dateStr,
+                      clientFirstName: v.clientFirstName,
+                      clientLastName: v.clientLastName,
                       petLabels: v.petLabels,
                       weightKg: v.weightKg,
                       paymentMethod: v.paymentMethod,
@@ -112,6 +120,8 @@ export function BookingPage (): JSX.Element {
                       refCode: v.refCode,
                       petShipId: v.petShipId,
                       date: dateStr,
+                      clientFirstName: v.clientFirstName,
+                      clientLastName: v.clientLastName,
                       petLabels: v.petLabels,
                       weightKg: v.weightKg,
                       paymentMethod: v.paymentMethod,
@@ -144,6 +154,12 @@ export function BookingPage (): JSX.Element {
     const columns: ColumnsType<BookingRecord> = useMemo(
         () => [
             { title: 'Ref', dataIndex: 'refCode', key: 'refCode', width: 100 },
+            {
+                title: 'Client',
+                key: 'client',
+                width: 170,
+                render: (_, record) => `${record.clientFirstName} ${record.clientLastName}`.trim(),
+            },
             {
                 title: 'Pet ship',
                 key: 'petShip',
@@ -248,6 +264,20 @@ export function BookingPage (): JSX.Element {
                     <Form.Item name="refCode" label="Ref" rules={[{ required: true, message: 'Required' }]}>
                         <Input data-testid="booking-field-ref" />
                     </Form.Item>
+                    <Form.Item
+                        name="clientFirstName"
+                        label="Client First Name"
+                        rules={[{ required: true, message: 'Required' }]}
+                    >
+                        <Input data-testid="booking-field-client-first-name" />
+                    </Form.Item>
+                    <Form.Item
+                        name="clientLastName"
+                        label="Client Last Name"
+                        rules={[{ required: true, message: 'Required' }]}
+                    >
+                        <Input data-testid="booking-field-client-last-name" />
+                    </Form.Item>
                     <Form.Item name="petShipId" label="Pet ship" rules={[{ required: true }]}>
                         <Select
                             options={shipOptionsForModal}
@@ -259,7 +289,11 @@ export function BookingPage (): JSX.Element {
                     </Form.Item>
                     <Form.Item name="date" label="Date" rules={[{ required: true }]}>
                         <div data-testid="booking-field-date">
-                            <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
+                            <DatePicker
+                                style={{ width: '100%' }}
+                                format="YYYY-MM-DD"
+                                inputReadOnly={false}
+                            />
                         </div>
                     </Form.Item>
                     <Form.Item

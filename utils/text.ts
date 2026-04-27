@@ -17,6 +17,8 @@ export const menu = {
     dogDaycare: process.env.E2E_UI_MENU_DOG_DAYCARE || 'Dog Daycare',
     petSeaters: process.env.E2E_UI_MENU_PET_SEATERS || 'Pet Seaters',
     points: process.env.E2E_UI_MENU_POINTS || 'Points',
+    ourClients: process.env.E2E_UI_MENU_OUR_CLIENTS || 'Our Clients',
+    europeShows: process.env.E2E_UI_MENU_EUROPE_SHOWS || 'Europe Shows',
 };
 
 export const petShipping = {

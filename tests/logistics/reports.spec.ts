@@ -1,28 +1,22 @@
 import * as fs from 'fs';
 import { randomUUID } from 'node:crypto';
-import { test, expect } from '@playwright/test';
 import { config } from '../../config-logistics';
-import { MENU_ITEM } from '../../utils/constants';
-import { LogisticsApp } from '../../pageObjects/LogisticsApp';
+import { MENU_ITEM, REPORTS_DATA_TESTID } from '../../utils/constants';
+import { getCurrentMonthRangeDays, getCurrentMonthRangeDaysUTC } from '../../utils/date';
+import { E2E_SKIP, e2eReports } from '../../utils/e2eTestData';
 import type { EmailSendCapture } from '../../pageObjects/Reports';
 import { reports } from '../../utils/text';
-import { getCurrentMonthRangeDays, getCurrentMonthRangeDaysUTC } from '../../utils/date';
 import {
     loadLogisticsReportFixtures,
     type LogisticsReportGraphqlExpected,
     type LogisticsReportFixtures
 } from './reportFixtures';
+import { expect, test } from '../fixtures/logisticsApp.fixture';
 
 // --- Module-level inputs (env + external fixtures) ---
 const { uiUsername } = config;
 
 const fixtures: LogisticsReportFixtures | null = loadLogisticsReportFixtures();
-
-// Calendar range shown in the UI date filter (local) and expected ISO date substrings in GraphQL (UTC helpers).
-const { startDay: currentMonthStart, endDay: currentMonthEnd } = getCurrentMonthRangeDays();
-const { startDayUTC: currentMonthStartUTC, endDayUTC: currentMonthEndUTC } = getCurrentMonthRangeDaysUTC();
-const startDate = currentMonthStart;
-const endDate = currentMonthEnd;
 
 // --- Shapes for parsing the persisted GraphQL request body (see `emailSend.requestJsonPath`) ---
 interface TicketReportRequestVars {
@@ -44,15 +38,15 @@ interface GraphqlRequestBody {
 
 test.describe('Reports', () => {
     // No suite runs without fixture data (keeps NDA payloads out of git).
-    test.skip(
-        !fixtures,
-        'NDA: add tests/logistics/fixtures.local.json (see fixtures.example.json) or LOGISTICS_REPORT_FIXTURES_JSON'
-    );
+    test.skip(!fixtures, E2E_SKIP.REPORTS_FIXTURES_NDA);
 
-    test('Send report by email with updated filters', async ({ page }) => {
+    test('Send report by email with updated filters', async ({ page, logisticsApp }) => {
         test.skip(
-            !config.adminUsername || !config.adminPassword,
-            'Set LOGISTICS_ADMIN_USER_NAME and LOGISTICS_ADMIN_PASSWORD: Reports precondition creates PetMover via PetMovers (PetAdmin only).'
+            !config.adminUsername
+            || !config.adminPassword
+            || !config.accountantUsername
+            || !config.accountantPassword,
+            E2E_SKIP.REPORTS_ADMIN_AND_ACCOUNTANT
         );
 
         // --- Fixture unpack: labels, id maps, and expected GraphQL fragment ---
@@ -65,42 +59,61 @@ test.describe('Reports', () => {
             graphql: expectedRequest
         } = fx;
 
+        // Calendar range at run time (not module load) so long-lived workers / midnight do not stale the range.
+        const { startDay: currentMonthStart, endDay: currentMonthEnd } = getCurrentMonthRangeDays();
+        const { startDayUTC: currentMonthStartUTC, endDayUTC: currentMonthEndUTC } =
+            getCurrentMonthRangeDaysUTC();
+        const startDate = currentMonthStart;
+        const endDate = currentMonthEnd;
+
         // --- Act + assert; finally: remove PetMover `petmover-<uuid>` ---
-        const app = new LogisticsApp(page);
-        await app.loginAsPetAdmin();
-        await app.clearPetMoversStorage();
+        await logisticsApp.loginAsPetAdmin();
+        await logisticsApp.clearPetMoversStorage();
 
         const pmUuid = randomUUID();
-        const petMoverName = `petmover-${pmUuid}`;
-        const petMoverCode = `E2E-RPT-${pmUuid.replace(/-/g, '').slice(0, 12)}`;
+        const petMoverName = `${e2eReports.petMoverNamePrefix}${pmUuid}`;
+        const petMoverCode = e2eReports.petMoverCodeFromUuid(pmUuid);
         let petMoverCodeForTeardown: string | undefined;
 
         try {
-            await app.navigationSidebar.clickMenuItem(MENU_ITEM.PET_MOVERS);
-            const petMoverUi = await app.petMovers.createActivePetMover({
+            await logisticsApp.navigationSidebar.clickMenuItem(MENU_ITEM.PET_MOVERS);
+            const petMoverUi = await logisticsApp.petMovers.createActivePetMover({
                 name: petMoverName,
                 code: petMoverCode,
             });
             petMoverCodeForTeardown = petMoverCode;
 
+            // Reports form (incl. `data-testid="pet-reports-pet-mover"`) is used as PetAccountant; admin only for PetMovers precondition.
+            await logisticsApp.loginAsPetAccountant();
+
             const base = config.baseUrl.trim().replace(/\/?$/, '');
             await page.goto(`${base}/reports`, { waitUntil: 'domcontentloaded' });
+            await expect(page.getByRole('heading', { name: e2eReports.pageHeading })).toBeVisible({
+                timeout: 20000,
+            });
+            await expect(page.getByTestId(REPORTS_DATA_TESTID.petMoverField)).toBeVisible({
+                timeout: 20000,
+            });
 
-            await app.reports.field.selectOptions({ name: reports.petMover, options: petMoverUi.label });
-            await app.reports.field.fillDateRange({ name: reports.dateRange, startDate, endDate });
-            await app.reports.field.selectOptions({ name: reports.paymentType, options: uiPaymentMethods });
-            await app.reports.field.selectOptions({ name: reports.currency, options: uiCurrencies });
+            await logisticsApp.reports.field.selectOptions({
+                name: reports.petMover,
+                options: petMoverUi.label,
+                testId: REPORTS_DATA_TESTID.petMoverField,
+            });
+            await logisticsApp.reports.field.fillDateRange({ name: reports.dateRange, startDate, endDate });
+            await logisticsApp.reports.field.selectOptions({ name: reports.paymentType, options: uiPaymentMethods });
+            await logisticsApp.reports.field.selectOptions({ name: reports.currency, options: uiCurrencies });
 
             if (uiUsername) {
-                await app.reports.field.fillField({ name: reports.sendReportTo, value: uiUsername });
+                await logisticsApp.reports.field.fillField({ name: reports.sendReportTo, value: uiUsername });
             } else {
-                await app.reports.field.fillField({
+                await logisticsApp.reports.field.fillField({
                     name: reports.sendReportTo,
-                    value: 'reports-e2e@example.com',
+                    value: e2eReports.fallbackSendReportEmail,
                 });
             }
 
-            const emailSend: EmailSendCapture = await app.reports.sendByEmail();
+            const emailSend: EmailSendCapture = await logisticsApp.reports.sendByEmail();
 
             // --- Assert: request basics ---
             expect(emailSend && emailSend.requestUrl).toBeTruthy();
@@ -201,7 +214,8 @@ test.describe('Reports', () => {
         } finally {
             if (petMoverCodeForTeardown) {
                 try {
-                    await app.deletePetMoverByCode(petMoverCodeForTeardown);
+                    await logisticsApp.loginAsPetAdmin();
+                    await logisticsApp.deletePetMoverByCode(petMoverCodeForTeardown);
                 } catch {
                     /* ignore */
                 }

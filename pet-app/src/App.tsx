@@ -8,7 +8,6 @@ import {
     ROLE_PET_ACCOUNTANT,
     ROLE_PET_USER,
 } from './auth';
-import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { PetMoversPage } from './pages/PetMoversPage';
@@ -18,6 +17,8 @@ import { PointsPage } from './pages/PointsPage';
 import { DashboardHome } from './pages/DashboardHome';
 import { DogDaycarePage } from './pages/DogDaycarePage';
 import { PetSeatersPage } from './pages/PetSeatersPage';
+import { EuropeShowsPage } from './pages/EuropeShowsPage';
+import { OurClientsPage } from './pages/OurClientsPage';
 
 function useAuthed (): boolean {
     return getAuthSession() != null;
@@ -27,7 +28,7 @@ function useAuthed (): boolean {
 function OperationalShell ({ children }: { children: ReactNode }): JSX.Element {
     const loc = useLocation();
     if (!useAuthed()) {
-        return <Navigate to="/" state={{ from: loc }} replace />;
+        return <Navigate to="/login" state={{ from: loc }} replace />;
     }
     if (isPetAccountant()) {
         return <Navigate to="/reports" replace />;
@@ -40,7 +41,7 @@ function OperationalShell ({ children }: { children: ReactNode }): JSX.Element {
 function ReportsShell ({ children }: { children: ReactNode }): JSX.Element {
     const loc = useLocation();
     if (!useAuthed()) {
-        return <Navigate to="/" state={{ from: loc }} replace />;
+        return <Navigate to="/login" state={{ from: loc }} replace />;
     }
     if (getAuthSession()?.role === ROLE_PET_USER) {
         return <Navigate to="/home" replace />;
@@ -51,7 +52,7 @@ function ReportsShell ({ children }: { children: ReactNode }): JSX.Element {
 
 function RootIndex (): JSX.Element {
     if (!useAuthed()) {
-        return <HomePage />;
+        return <Navigate to="/login" replace />;
     }
     if (getAuthSession()?.role === ROLE_PET_ACCOUNTANT) {
         return <Navigate to="/reports" replace />;
@@ -63,7 +64,7 @@ function RootIndex (): JSX.Element {
 function PetMoversRoute (): JSX.Element {
     const loc = useLocation();
     if (!useAuthed()) {
-        return <Navigate to="/" state={{ from: loc }} replace />;
+        return <Navigate to="/login" state={{ from: loc }} replace />;
     }
     if (!isPetAdmin()) {
         return <Navigate to={isPetAccountant() ? '/reports' : '/home'} replace />;
@@ -134,6 +135,22 @@ export function App (): JSX.Element {
                 element={
                     <OperationalShell>
                         <PointsPage />
+                    </OperationalShell>
+                }
+            />
+            <Route
+                path="/our-clients"
+                element={
+                    <OperationalShell>
+                        <OurClientsPage />
+                    </OperationalShell>
+                }
+            />
+            <Route
+                path="/europe-shows"
+                element={
+                    <OperationalShell>
+                        <EuropeShowsPage />
                     </OperationalShell>
                 }
             />

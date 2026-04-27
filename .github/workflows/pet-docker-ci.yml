@@ -1,0 +1,285 @@
+# PET Docker CI
+# 1) build + push pet-app → GHCR
+# 2) discover tests/logistics/*.spec.ts
+# 3) prep: Chromium — role smoke + logistics_session → storageState/session.json
+# 4) матрица: один job на файл спека; `--no-deps`, headless Chromium
+#
+# Compose: по умолчанию `.github/scripts/ci/compose-e2e.sh` → docker-compose.e2e.yml (PET UI + Playwright, без Postgres).
+# Перед `compose up`/`run` пишется корневой `.env` из secrets (`write-docker-e2e-env.sh`) — как у локального первого запуска.
+# Полный стек (БД + заглушка api + UI + e2e): docker-compose.stack.yml — в job задайте env E2E_COMPOSE_STACK=1
+# (тот же compose-e2e.sh). После появления реального бэка правьте сервис `api` и LOGISTICS_BASE_API_URL у `e2e` в stack-файле.
+
+name: PET Docker CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: pet-docker-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pet-app-image:
+    name: Build & push PET UI (GHCR)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    env:
+      DOCKER_BUILDKIT: 1
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Image coordinates
+        id: meta
+        run: |
+          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "PET_APP_IMAGE_PREFIX=ghcr.io/${REPO_LC}/pet-app" >> "$GITHUB_ENV"
+          echo "image=ghcr.io/${REPO_LC}/pet-app:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build PET UI image
+        env:
+          LOGISTICS_UI_USER_NAME: ${{ secrets.LOGISTICS_UI_USER_NAME }}
+          LOGISTICS_PASSWORD: ${{ secrets.LOGISTICS_PASSWORD }}
+          LOGISTICS_ADMIN_USER_NAME: ${{ secrets.LOGISTICS_ADMIN_USER_NAME }}
+          LOGISTICS_ADMIN_PASSWORD: ${{ secrets.LOGISTICS_ADMIN_PASSWORD }}
+          LOGISTICS_ACCOUNTANT_USER_NAME: ${{ secrets.LOGISTICS_ACCOUNTANT_USER_NAME }}
+          LOGISTICS_ACCOUNTANT_PASSWORD: ${{ secrets.LOGISTICS_ACCOUNTANT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          # Align bundle `VITE_PET_*` with E2E compose (same as `docker-compose.e2e.yml` build args).
+          # Without this, GHCR images use Dockerfile defaults while Playwright uses secrets → login failures.
+          U="${LOGISTICS_UI_USER_NAME:-pet@example.com}"
+          P="${LOGISTICS_PASSWORD:-pet-secret}"
+          AU="${LOGISTICS_ADMIN_USER_NAME:-pet-admin@example.com}"
+          AP="${LOGISTICS_ADMIN_PASSWORD:-pet-admin-secret}"
+          CU="${LOGISTICS_ACCOUNTANT_USER_NAME:-pet-accountant@example.com}"
+          CP="${LOGISTICS_ACCOUNTANT_PASSWORD:-pet-accountant-secret}"
+          docker build ./pet-app \
+            --build-arg "VITE_PET_USER=$U" \
+            --build-arg "VITE_PET_PASSWORD=$P" \
+            --build-arg "VITE_PET_ADMIN_USER=$AU" \
+            --build-arg "VITE_PET_ADMIN_PASSWORD=$AP" \
+            --build-arg "VITE_PET_ACCOUNTANT_USER=$CU" \
+            --build-arg "VITE_PET_ACCOUNTANT_PASSWORD=$CP" \
+            --tag "${PET_APP_IMAGE_PREFIX}:${GITHUB_SHA}"
+
+      - name: Push SHA tag
+        run: docker push "${PET_APP_IMAGE_PREFIX}:${GITHUB_SHA}"
+
+      - name: Push latest (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          docker tag "${PET_APP_IMAGE_PREFIX}:${GITHUB_SHA}" "${PET_APP_IMAGE_PREFIX}:latest"
+          docker push "${PET_APP_IMAGE_PREFIX}:latest"
+
+  e2e-matrix-prep:
+    name: Discover logistics specs
+    runs-on: ubuntu-latest
+    outputs:
+      include: ${{ steps.set.outputs.include }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: set
+        name: List tests/logistics/*.spec.ts
+        run: |
+          set -euo pipefail
+          if [ ! -d tests/logistics ]; then
+            echo '::error::tests/logistics not found'
+            exit 1
+          fi
+          node <<'NODE'
+          const crypto = require('crypto');
+          const fs = require('fs');
+          const path = require('path');
+
+          const outPath = process.env.GITHUB_OUTPUT;
+          const dir = path.join(process.cwd(), 'tests', 'logistics');
+          const include = fs
+            .readdirSync(dir)
+            .filter((f) => f.endsWith('.spec.ts'))
+            .sort()
+            .map((f) => ({
+              name: f.replace(/\.spec\.ts$/, ''),
+              spec: path.posix.join('tests', 'logistics', f),
+            }));
+
+          if (include.length === 0) {
+            console.error('No tests/logistics/*.spec.ts');
+            process.exit(1);
+          }
+
+          const json = JSON.stringify(include);
+          const delim = `MATRIX_${crypto.randomBytes(16).toString('hex')}`;
+          fs.appendFileSync(outPath, `include<<${delim}\n${json}\n${delim}\n`);
+          NODE
+
+  e2e-session-prep:
+    name: Session + role smoke (Chromium)
+    needs: pet-app-image
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DOCKER_BUILDKIT: 1
+      PET_APP_IMAGE: ${{ needs.pet-app-image.outputs.image }}
+      PET_APP_USE_PREBUILT: "1"
+      LOGISTICS_UI_USER_NAME: ${{ secrets.LOGISTICS_UI_USER_NAME }}
+      LOGISTICS_PASSWORD: ${{ secrets.LOGISTICS_PASSWORD }}
+      LOGISTICS_ADMIN_USER_NAME: ${{ secrets.LOGISTICS_ADMIN_USER_NAME }}
+      LOGISTICS_ADMIN_PASSWORD: ${{ secrets.LOGISTICS_ADMIN_PASSWORD }}
+      LOGISTICS_ACCOUNTANT_USER_NAME: ${{ secrets.LOGISTICS_ACCOUNTANT_USER_NAME }}
+      LOGISTICS_ACCOUNTANT_PASSWORD: ${{ secrets.LOGISTICS_ACCOUNTANT_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull PET UI image
+        run: docker pull "${PET_APP_IMAGE}"
+
+      - name: Write .env for Docker Compose (auth + defaults)
+        run: bash .github/scripts/ci/write-docker-e2e-env.sh
+
+      - name: Role smoke + logistics session (Playwright)
+        run: bash .github/scripts/ci/compose-e2e.sh run --rm e2e bash /work/scripts/docker-e2e-session-prep.sh
+
+      - name: Compose teardown
+        if: always()
+        run: bash .github/scripts/ci/compose-e2e.sh down -v
+
+      - name: Upload session prep failure artifacts (JUnit, traces, Allure)
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-session-prep-failure
+          path: |
+            results.xml
+            test-results
+            allure-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload Playwright storage state
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-storage-state
+          path: storageState
+          if-no-files-found: error
+          retention-days: 7
+
+  e2e-spec:
+    name: E2E / ${{ matrix.name }}
+    needs:
+      - pet-app-image
+      - e2e-matrix-prep
+      - e2e-session-prep
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      checks: write
+      packages: read
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        include: ${{ fromJson(needs.e2e-matrix-prep.outputs.include) }}
+
+    env:
+      DOCKER_BUILDKIT: 1
+      COMPOSE_DOCKER_CLI_BUILD: 1
+      PET_APP_IMAGE: ${{ needs.pet-app-image.outputs.image }}
+      PET_APP_USE_PREBUILT: "1"
+      E2E_WEB_NO_DEPS: "1"
+      E2E_PLAYWRIGHT_SPEC: ${{ matrix.spec }}
+      LOGISTICS_UI_USER_NAME: ${{ secrets.LOGISTICS_UI_USER_NAME }}
+      LOGISTICS_PASSWORD: ${{ secrets.LOGISTICS_PASSWORD }}
+      LOGISTICS_ADMIN_USER_NAME: ${{ secrets.LOGISTICS_ADMIN_USER_NAME }}
+      LOGISTICS_ADMIN_PASSWORD: ${{ secrets.LOGISTICS_ADMIN_PASSWORD }}
+      LOGISTICS_ACCOUNTANT_USER_NAME: ${{ secrets.LOGISTICS_ACCOUNTANT_USER_NAME }}
+      LOGISTICS_ACCOUNTANT_PASSWORD: ${{ secrets.LOGISTICS_ACCOUNTANT_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: e2e-storage-state
+          path: .
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull PET UI image
+        run: docker pull "${PET_APP_IMAGE}"
+
+      - name: Write .env for Docker Compose (auth + defaults)
+        run: bash .github/scripts/ci/write-docker-e2e-env.sh
+
+      - name: Playwright E2E (Chromium, headless)
+        run: >
+          bash .github/scripts/ci/compose-e2e.sh up
+          --no-build
+          --abort-on-container-exit
+          --exit-code-from e2e
+
+      - name: Compose teardown
+        if: always()
+        run: bash .github/scripts/ci/compose-e2e.sh down -v
+
+      - name: Publish JUnit to GitHub Checks
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always() && hashFiles('results.xml') != ''
+        with:
+          files: results.xml
+          check_name: E2E / ${{ matrix.name }}
+          comment_mode: off
+
+      - name: Upload JUnit
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-junit-${{ matrix.name }}
+          path: results.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-docker-${{ matrix.name }}
+          path: |
+            results.xml
+            test-results
+            allure-results
+          if-no-files-found: warn
