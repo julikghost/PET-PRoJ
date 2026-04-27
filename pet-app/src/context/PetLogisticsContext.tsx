@@ -24,7 +24,8 @@ import type {
 import {
     computeBookingPrice,
     computeDogDaycarePrice,
-    normalizeDogDaycareHoursPerDay,
+    normalizeDogDaycareHours,
+    petShipScheduleValidationMessage,
 } from '../utils/pricing';
 
 dayjs.extend(customParseFormat);
@@ -491,6 +492,12 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
                 }
                 if (full.fromPointId === full.toPointId) {
                     toast.error('From and To must differ');
+
+                    return prev;
+                }
+                const scheduleErr = petShipScheduleValidationMessage(full.departure, full.arrival);
+                if (scheduleErr) {
+                    toast.error(scheduleErr);
 
                     return prev;
                 }

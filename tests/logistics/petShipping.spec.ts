@@ -4,7 +4,7 @@ import { getCurrentAndTomorrowDateTimes } from '../../utils/date';
 import { E2E_SKIP, e2eRefs, e2eRoutes } from '../../utils/e2eTestData';
 import { petShipping as petShippingText } from '../../utils/text';
 import { points as pointsText } from '../../utils/text';
-import { expect, test } from '../fixtures/logisticsApp.fixture';
+import { getSameDayPetShipDateTimes } from '../../utils/date';
 
 const { adminUsername, adminPassword } = config;
 
@@ -13,10 +13,8 @@ test.describe('PetShipping', () => {
         test.skip(!adminUsername || !adminPassword, E2E_SKIP.LOGISTICS_ADMIN_PET_SHIPPING);
 
         const ts = Date.now();
-        const shipRef = e2eRefs.petShip(ts);
-        const { currentDateTime, tomorrowDateTime } = getCurrentAndTomorrowDateTimes();
-        const departure = currentDateTime;
-        const arrival = tomorrowDateTime;
+        const shipRef = `E2E-PS-${ts}`;
+        const { departure, arrival } = getSameDayPetShipDateTimes();
         let pmCode: string | undefined;
         let pm2Code: string | undefined;
         let codeFrom: string | undefined;

@@ -5,7 +5,7 @@ import { E2E_SKIP, e2eBooking, e2eRefs, e2eRoutes } from '../../utils/e2eTestDat
 import { booking as bookingText } from '../../utils/text';
 import { petShipping as petShippingText } from '../../utils/text';
 import { points as pointsText } from '../../utils/text';
-import { expect, test } from '../fixtures/logisticsApp.fixture';
+import { getSameDayPetShipDateTimes, getTodayAndTomorrowDays } from '../../utils/date';
 
 const { adminUsername, adminPassword } = config;
 
@@ -14,12 +14,10 @@ test.describe('Booking', () => {
         test.skip(!adminUsername || !adminPassword, E2E_SKIP.LOGISTICS_ADMIN_BOOKING_FLOW);
 
         const ts = Date.now();
-        const shipRef = e2eRefs.bookingShip(ts);
-        const bkRef = e2eRefs.booking(ts);
-        const { currentDateTime, tomorrowDateTime } = getCurrentAndTomorrowDateTimes();
+        const shipRef = `E2E-BK-SHIP-${ts}`;
+        const bkRef = `E2E-BK-${ts}`;
+        const { departure, arrival } = getSameDayPetShipDateTimes();
         const { todayDay, tomorrowDay } = getTodayAndTomorrowDays();
-        const departure = currentDateTime;
-        const arrival = tomorrowDateTime;
         let pmCode: string | undefined;
         let codeFrom: string | undefined;
         let codeTo: string | undefined;
