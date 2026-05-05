@@ -8,6 +8,8 @@ import { booking as bookingText } from '../utils/text';
 
 export type BookingModalValues = {
     refCode: string;
+    clientFirstName: string;
+    clientLastName: string;
     petShipLabel: string;
     dateYmd: string;
     petLabels: string[];
@@ -118,6 +120,8 @@ export class Booking {
             const modal = this.editDialog();
             await expect(modal).toBeVisible();
             await modal.getByTestId('booking-field-ref').fill(values.refCode);
+            await modal.getByTestId('booking-field-client-first-name').fill(values.clientFirstName);
+            await modal.getByTestId('booking-field-client-last-name').fill(values.clientLastName);
 
             const petShipField = modal.getByTestId('booking-field-pet-ship');
             await petShipField.locator('.ant-select-selector').click({ force: true });
@@ -252,6 +256,16 @@ export class Booking {
         await test.step(`Booking table row contains: ${substring}`, async () => {
             const table = this.root.getByTestId('booking-table');
             await expect(table.locator('tr').filter({ hasText: substring })).toBeVisible();
+        });
+    }
+
+    async expectRowContainsAll (substrings: string[]): Promise<void> {
+        await test.step(`Booking table row contains all: ${substrings.join(' | ')}`, async () => {
+            let rows = this.root.getByTestId('booking-table').locator('tr');
+            for (const s of substrings) {
+                rows = rows.filter({ hasText: s });
+            }
+            await expect(rows.first()).toBeVisible();
         });
     }
 

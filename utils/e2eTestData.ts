@@ -69,13 +69,20 @@ export const e2eDogDaycare = {
     dogNameCreate: 'E2E Rex',
     dogNameUpdate: 'E2E Rex Pro',
     dogWeightKg: '8',
+    clientFirstName: 'E2E John',
+    clientLastName: 'Doe',
+    breed: 'Beagle',
+    ageYears: '3',
+    ageMonths: '2',
     currencyLabel: 'EUR',
-    hours: '4',
+    hours: '6',
     statusCreate: 'Scheduled',
     statusUpdate: 'Checked in',
 } as const;
 
 export const e2eBooking = {
+    clientFirstName: 'E2E John',
+    clientLastName: 'Tester',
     petLabelsCreate: [bookingSpecies.cat] as string[],
     petLabelsUpdate: [bookingSpecies.dog] as string[],
     weightCreate: '6',

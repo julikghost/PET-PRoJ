@@ -79,8 +79,8 @@ export class DogDaycare {
         await this.waitUntilAntSelectDropdownClosed();
     }
 
-    private async resolveBookingDateInput (modal: Locator): Promise<Locator> {
-        const dateField = modal.getByTestId('daycare-field-booking-date');
+    private async resolveDateInput (modal: Locator, fieldTestId: string): Promise<Locator> {
+        const dateField = modal.getByTestId(fieldTestId);
         await expect(dateField).toBeVisible({ timeout: 15000 });
         const dateInput = dateField.locator('input').first();
         await expect(dateInput).toBeVisible({ timeout: 15000 });
@@ -106,7 +106,7 @@ export class DogDaycare {
     /**
      * Do not press Escape: Ant Design may close the whole form Modal. Blur the picker via another field.
      */
-    private async fillBookingDateByTyping (modal: Locator, dateInput: Locator, dateYmd: string): Promise<void> {
+    private async fillDateByTyping (modal: Locator, dateInput: Locator, dateYmd: string): Promise<void> {
         await modal.getByTestId('daycare-field-ref').click({ force: true });
         await expectAntPickerDropdownsClosed(this.page);
         await dateInput.click({ force: true });
@@ -115,12 +115,12 @@ export class DogDaycare {
         await dateInput.press('Enter');
     }
 
-    private async fillBookingDateYmd (modal: Locator, dateYmd: string): Promise<void> {
-        const dateInput = await this.resolveBookingDateInput(modal);
+    private async fillDateYmd (modal: Locator, fieldTestId: string, dateYmd: string): Promise<void> {
+        const dateInput = await this.resolveDateInput(modal, fieldTestId);
         await dateInput.click({ force: true });
         const pickedFromCalendar = await this.tryPickDateFromAntCalendar(dateYmd);
         if (!pickedFromCalendar) {
-            await this.fillBookingDateByTyping(modal, dateInput, dateYmd);
+            await this.fillDateByTyping(modal, dateInput, dateYmd);
         }
         await expect(dateInput).toHaveValue(dateYmd, { timeout: 15000 });
     }
@@ -131,11 +131,11 @@ export class DogDaycare {
         hours: string
     ): Promise<void> {
         const weightInput = modal.getByTestId('daycare-field-weight').locator('input');
-        await weightInput.click();
+        await weightInput.click({ force: true });
         await weightInput.clear();
         await weightInput.fill(dogWeightKg);
-        const hoursInput = modal.getByTestId('daycare-field-hours').locator('input');
-        await hoursInput.click();
+        const hoursInput = modal.getByTestId('daycare-field-hours-per-day').locator('input');
+        await hoursInput.click({ force: true });
         await hoursInput.clear();
         await hoursInput.fill(hours);
     }
@@ -157,6 +157,23 @@ export class DogDaycare {
         ]);
     }
 
+    private async selectBreed (modal: Locator, breed: string): Promise<void> {
+        await test.step(`Select breed ${breed}`, async () => {
+            const field = modal.getByTestId('daycare-field-breed');
+            await field.click({ force: true });
+            const dropdown = this.visibleAntSelectDropdown().last();
+            await expect(dropdown).toBeVisible({ timeout: 15000 });
+            const searchInput = field.locator('input[role="combobox"]').first();
+            if (await searchInput.isVisible()) {
+                await searchInput.fill(breed);
+            }
+            const option = dropdown.locator('.ant-select-item-option-content').filter({ hasText: breed }).first();
+            await option.click({ force: true });
+            await this.waitUntilAntSelectDropdownClosed();
+            await expect(field.locator('.ant-select-selection-item').filter({ hasText: breed }).first()).toBeVisible();
+        });
+    }
+
     async expectLoaded (): Promise<void> {
         await test.step('Dog Daycare page visible', async () => {
             await expect(this.root).toBeVisible();
@@ -174,13 +191,17 @@ export class DogDaycare {
     async fillForm (values: {
         refCode: string;
         bookingRefCode: string;
-        bookingDateYmd: string;
+        clientFirstName: string;
+        clientLastName: string;
+        startDateYmd: string;
+        endDateYmd: string;
         dogName: string;
-        /** Numeric string, e.g. "8" or "8.5". */
+        breed: string;
+        ageText?: string;
         dogWeightKg: string;
         /** Visible option: EUR or USD. */
         currencyLabel: string;
-        hours: string;
+        hoursPerDay: string;
         /** Status label: Scheduled, Checked in, Active, Checked out. */
         statusLabel: string;
         notes?: string;
@@ -190,9 +211,16 @@ export class DogDaycare {
             await expect(modal).toBeVisible();
             await modal.getByTestId('daycare-field-ref').fill(values.refCode);
             await modal.getByTestId('daycare-field-booking-ref').fill(values.bookingRefCode);
-            await this.fillBookingDateYmd(modal, values.bookingDateYmd);
+            await modal.getByTestId('daycare-field-client-first-name').fill(values.clientFirstName);
+            await modal.getByTestId('daycare-field-client-last-name').fill(values.clientLastName);
+            await this.fillDateYmd(modal, 'daycare-field-start-date', values.startDateYmd);
+            await this.fillDateYmd(modal, 'daycare-field-end-date', values.endDateYmd);
             await modal.getByTestId('daycare-field-dog-name').fill(values.dogName);
-            await this.fillWeightAndHoursInputs(modal, values.dogWeightKg, values.hours);
+            await this.selectBreed(modal, values.breed);
+            if (values.ageText?.trim()) {
+                await modal.getByTestId('daycare-field-age-text').fill(values.ageText);
+            }
+            await this.fillWeightAndHoursInputs(modal, values.dogWeightKg, values.hoursPerDay);
             await this.fillCurrencyAndStatusSelects(modal, values.currencyLabel, values.statusLabel);
             if (values.notes !== undefined) {
                 await modal.getByTestId('daycare-field-notes').fill(values.notes);

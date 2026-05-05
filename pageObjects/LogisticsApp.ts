@@ -8,6 +8,7 @@ import { config } from '../config-logistics';
 import { openPetStubLoginPage } from '../utils/petStubLoginPage';
 import { MENU_ITEM } from '../utils/constants';
 import { Login } from './Login';
+import type { BookingModalValues } from './Booking';
 import { Reports } from './Reports';
 import { PetMovers } from './PetMovers';
 import { PetShipping } from './PetShipping';
@@ -18,6 +19,8 @@ import { NavigationSidebar } from './NavigationSidebar';
 
 /** Docker runners are slower; PET stub navigation after submit needs more slack than local dev. */
 const PET_POST_LOGIN_ASSERT_MS = process.env.E2E_DOCKER === '1' ? 45_000 : 20_000;
+const PET_AUTH_STORAGE_KEY = 'pet-auth';
+const PET_ADMIN_ROLE = 'PetAdmin';
 
 export class LogisticsApp {
     readonly page: Page;
@@ -93,6 +96,141 @@ export class LogisticsApp {
             await this.login.signInPetApp(uiUsername, password);
             await expect(this.page).not.toHaveURL(/\/login$/, { timeout: PET_POST_LOGIN_ASSERT_MS });
         });
+    }
+
+    /**
+     * Injects a PetAdmin session into localStorage (`pet-auth`) on the PET origin.
+     * Useful when `storageState` is missing or holds a non-admin role.
+     */
+    private async seedPetAdminSession (): Promise<void> {
+        await test.step('Seed PetAdmin session in localStorage', async () => {
+            await this.page.goto('/home', { waitUntil: 'domcontentloaded' });
+            await this.page.evaluate(([key, role]) => {
+                    localStorage.setItem(
+                        key,
+                        JSON.stringify({
+                            accessToken: 'pet-e2e-access-token',
+                            role,
+                        })
+                    );
+                },
+            [PET_AUTH_STORAGE_KEY, PET_ADMIN_ROLE]);
+            await this.page.reload({ waitUntil: 'domcontentloaded' });
+        });
+    }
+
+    /**
+     * Use existing session from storageState (already logged in) and just clean local storages.
+     * Assumes caller project set `use.storageState` to an active PET session (e.g., PetAdmin).
+     */
+    async openWithSessionAndCleanData (): Promise<void> {
+        await test.step('Open with stored session and clear data', async () => {
+            await this.page.goto('/home');
+            await this.clearPetLogisticsData();
+            await this.clearPetMoversStorage();
+        });
+    }
+
+    /**
+     * Ensure PetAdmin role is active: use stored session if it works, otherwise seed PetAdmin auth.
+     * Always clears local storages afterward.
+     */
+    async ensurePetAdminSessionWithCleanData (): Promise<void> {
+        await test.step('Ensure PetAdmin session (storageState or login) and clear data', async () => {
+            await this.page.goto('/home', { waitUntil: 'domcontentloaded' });
+            const isAdmin = await this.page.evaluate(([key, role]) => {
+                try {
+                    const raw = localStorage.getItem(key);
+                    if (!raw) return false;
+                    const parsed = JSON.parse(raw) as { role?: string };
+                    return parsed.role === role;
+                } catch {
+                    return false;
+                }
+            }, [PET_AUTH_STORAGE_KEY, PET_ADMIN_ROLE]).catch(() => false);
+
+            if (!isAdmin) {
+                await this.seedPetAdminSession();
+            }
+
+            await this.clearPetLogisticsData();
+            await this.clearPetMoversStorage();
+        });
+    }
+
+    async goToPetShippingAndCreateShip (values: {
+        refCode: string;
+        fromLabel: string;
+        toLabel: string;
+        departure: string;
+        arrival: string;
+        petMover: string;
+        statusLabel: string;
+    }): Promise<void> {
+        await test.step(`PetShipping: create pet ship ${values.refCode}`, async () => {
+            await this.navigationSidebar.clickMenuItem(MENU_ITEM.PET_SHIPPING);
+            await this.petShipping.createPetShip(values);
+        });
+    }
+
+    async goToBookingAndCreate (values: BookingModalValues): Promise<void> {
+        await test.step(`Booking: create ${values.refCode}`, async () => {
+            await this.navigationSidebar.clickMenuItem(MENU_ITEM.BOOKING);
+            const bk = this.booking;
+            await bk.expectLoaded();
+            await bk.createBookingExpectCreatedToast(values);
+        });
+    }
+
+    async goToBookingCreateAndAssertList (values: BookingModalValues & {
+        rowPetLabel?: string;
+        rowShipLabel?: string;
+        rowPriceSnippet?: string;
+        rowPaymentSnippet?: string;
+    }): Promise<void> {
+        await test.step(`Booking: create ${values.refCode} and assert in list`, async () => {
+            await this.goToBookingAndCreate(values);
+            await this.booking.expectRowContains(values.refCode);
+            if (values.rowPetLabel ?? values.petLabels[0]) {
+                await this.booking.expectRowContains(values.rowPetLabel ?? values.petLabels[0]);
+            }
+            if (values.rowShipLabel ?? values.petShipLabel) {
+                await this.booking.expectRowContains(values.rowShipLabel ?? values.petShipLabel);
+            }
+            if (values.rowPriceSnippet) {
+                await this.booking.expectRowContains(values.rowPriceSnippet);
+            }
+            if (values.rowPaymentSnippet) {
+                await this.booking.expectRowContains(values.rowPaymentSnippet);
+            }
+        });
+    }
+
+    /**
+     * PetAdmin entrypoint for booking/pet shipping flows: open app, login as admin, clear local storages.
+     */
+    async openAsPetAdminWithCleanData (): Promise<void> {
+        await test.step('Open app as PetAdmin with clean data', async () => {
+            await this.openLogisticsApp();
+            await this.loginAsPetAdmin();
+            await this.clearPetLogisticsData();
+            await this.clearPetMoversStorage();
+        });
+    }
+
+    /**
+     * Assumes storageState already holds a valid PetUser session (project `logistics_session`).
+     * Clears local data, opens Home, navigates to Points, waits until Points page is ready.
+     * Returns the Points POM for chaining.
+     */
+    async openPointsWithSession (): Promise<Points> {
+        await test.step('Open Points page (session already active)', async () => {
+            await this.page.goto('/home');
+            await this.clearPetLogisticsData();
+            await this.navigationSidebar.clickMenuItem(MENU_ITEM.POINTS);
+            await this.points.expectLoaded();
+        });
+        return this.points;
     }
 
     /** Clears persisted Points / PetShipping / Booking demo data (`pet-logistics-v1`). */

@@ -8,7 +8,7 @@ import { config } from '../../config-logistics';
 import { MENU_ITEM } from '../../utils/constants';
 import { E2E_SKIP } from '../../utils/e2eTestData';
 import { usePetStubLoginFlow } from '../../utils/petStubLoginFlow';
-import { expect, test } from '../fixtures/logisticsApp.fixture';
+import { expect, test } from '../../fixtures/logisticsApp.fixture';
 
 test.describe('PET stub: role login smoke', () => {
     test.beforeEach(() => {

@@ -2,7 +2,7 @@
  * Shared Playwright fixtures: one {@link LogisticsApp} POM per test (no shared mutable state between tests).
  */
 import { test as base } from '@playwright/test';
-import { LogisticsApp } from '../../pageObjects/LogisticsApp';
+import { LogisticsApp } from '../pageObjects/LogisticsApp';
 
 export type LogisticsWorkerFixtures = {
     logisticsApp: LogisticsApp;

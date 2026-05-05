@@ -130,7 +130,6 @@ export default defineConfig({
                 ...defaultOptions,
                 ...(baseUrl.trim() ? { baseURL: baseUrl } : {}),
             },
-            dependencies: ['logistics_role_smoke'],
         },
         {
             name: 'logistics_web',
@@ -140,7 +139,6 @@ export default defineConfig({
                 storageState: storageStatePath,
             },
             testDir: './tests/logistics',
-            dependencies: ['logistics_role_smoke', 'logistics_session'],
         },
     ],
 });

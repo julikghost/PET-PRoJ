@@ -31,7 +31,9 @@ const DATE_FMT = 'YYYY-MM-DD';
 const MAX_PET_PHOTO_SIZE_MB = 3;
 
 const DOG_BREEDS_TOP_20 = [
+    'Australian Shepherd',
     'Beagle',
+    'Bernese Mountain Dog',
     'Border Collie',
     'Boxer',
     'Bulldog',
@@ -45,11 +47,13 @@ const DOG_BREEDS_TOP_20 = [
     'Husky',
     'Labrador Retriever',
     'Maltese',
+    'Pembroke Welsh Corgi',
     'Pomeranian',
     'Poodle',
     'Pug',
     'Rottweiler',
     'Shiba Inu',
+    'Welsh Cardigan Corgi',
     'Yorkshire Terrier',
 ].sort((a, b) => a.localeCompare(b));
 
@@ -101,9 +105,8 @@ export function DogDaycarePage (): JSX.Element {
         clientLastName: string;
         dogName: string;
         petPhotoUrl?: string;
-        breed: string;
-        ageYears: number;
-        ageMonths: number;
+        breed?: string;
+        ageText: string;
         currency: PetShipCurrency;
         hoursPerDay: number;
         status: DogDaycareStatus;
@@ -140,9 +143,8 @@ export function DogDaycarePage (): JSX.Element {
             clientLastName: '',
             dogName: '',
             petPhotoUrl: undefined,
-            breed: DOG_BREEDS_TOP_20[0],
-            ageYears: 1,
-            ageMonths: 0,
+            breed: undefined,
+            ageText: '',
             currency: 'EUR',
             hoursPerDay: 4,
             status: 'scheduled',
@@ -165,8 +167,7 @@ export function DogDaycarePage (): JSX.Element {
                 dogName: record.dogName,
                 petPhotoUrl: record.petPhotoUrl,
                 breed: record.breed,
-                ageYears: record.ageYears,
-                ageMonths: record.ageMonths,
+                ageText: formatDogAge(record.ageYears, record.ageMonths),
                 currency: record.currency,
                 hoursPerDay: record.hoursPerDay,
                 status: record.status,
@@ -178,36 +179,51 @@ export function DogDaycarePage (): JSX.Element {
         [form]
     );
 
-    const validateAgeRange = useCallback(async (): Promise<void> => {
-        const yearsRaw = form.getFieldValue('ageYears');
-        const monthsRaw = form.getFieldValue('ageMonths');
-        const hasYears = yearsRaw !== undefined && yearsRaw !== null;
-        const hasMonths = monthsRaw !== undefined && monthsRaw !== null;
-        if (!hasYears && !hasMonths) {
-            throw new Error('Specify age in years and/or months');
+    const parseAgeText = useCallback((ageText: string): { years: number; months: number } | null => {
+        const norm = ageText.replace(/,/g, ' ').toLowerCase();
+        const matches = Array.from(norm.matchAll(/(\d+)(\s*[ym]|[^\d\s]+)?/g));
+        if (matches.length === 0) return null;
+        let years = 0;
+        let months = 0;
+        for (const m of matches) {
+            const value = Number(m[1]);
+            const unit = m[2]?.trim() ?? '';
+            if (unit.startsWith('y')) {
+                years += value;
+            } else if (unit.startsWith('m')) {
+                months += value;
+            } else if (!unit) {
+                if (years === 0) {
+                    years += value;
+                } else {
+                    months += value;
+                }
+            }
         }
-        const years = hasYears ? Number(yearsRaw) : 0;
-        const months = hasMonths ? Number(monthsRaw) : 0;
-        if (!Number.isFinite(years) || years < 0 || years > 12) {
-            throw new Error('Years must be between 0 and 12');
+        if (months >= 12) {
+            years += Math.floor(months / 12);
+            months = months % 12;
         }
-        if (!Number.isFinite(months) || months < 0 || months > 11) {
-            throw new Error('Months must be between 0 and 11');
+        if (years < 0 || months < 0 || months > 11 || Number.isNaN(years) || Number.isNaN(months)) {
+            return null;
         }
-        const totalMonths = years * 12 + months;
-        if (totalMonths < 5 || totalMonths > 12 * 12) {
-            throw new Error('Age must be between 5 months and 12 years');
-        }
-    }, [form]);
+        return { years, months };
+    }, []);
 
     const submitModal = useCallback(async () => {
         const v = await form.validateFields();
+        const ageParsed = parseAgeText(v.ageText);
+        if (!ageParsed) {
+            toast.error('Enter age like "1y 5m" or "18m"');
+            return;
+        }
         const payload = {
             ...v,
             startDate: v.startDate.format(DATE_FMT),
             endDate: v.endDate.format(DATE_FMT),
-            ageYears: Number(v.ageYears ?? 0),
-            ageMonths: Number(v.ageMonths ?? 0),
+            breed: v.breed?.trim() ?? '',
+            ageYears: ageParsed.years,
+            ageMonths: ageParsed.months,
             hoursPerDay: Number(v.hoursPerDay),
             clientFirstName: v.clientFirstName,
             clientLastName: v.clientLastName,
@@ -402,6 +418,8 @@ export function DogDaycarePage (): JSX.Element {
                 }}
                 onOk={submitModal}
                 okText="Save"
+                style={{ top: 24 }}
+                bodyStyle={{ maxHeight: '70vh', overflowY: 'auto' }}
                 destroyOnClose
             >
                 <Form data-testid="daycare-form" form={form} layout="vertical" className="ant-form">
@@ -517,28 +535,29 @@ export function DogDaycarePage (): JSX.Element {
                             showSearch
                             optionFilterProp="label"
                             options={DOG_BREEDS_TOP_20.map((breed) => ({ value: breed, label: breed }))}
+                            placeholder="Select breed"
                             data-testid="daycare-field-breed"
                         />
                     </Form.Item>
                     <Form.Item
-                        name="ageYears"
-                        label="Age (years)"
-                        dependencies={['ageMonths']}
-                        rules={[{ validator: () => validateAgeRange() }]}
+                        name="ageText"
+                        label="Age (years and months)"
+                        rules={[
+                            { required: true, message: 'Required' },
+                            {
+                                validator: async (_, value) => {
+                                    if (!value?.trim()) return;
+                                    if (!parseAgeText(value)) {
+                                        throw new Error('Enter age like "1y 5m" or "18m"');
+                                    }
+                                },
+                            },
+                        ]}
                     >
-                        <div data-testid="daycare-field-age-years">
-                            <InputNumber min={0} max={12} precision={0} style={{ width: '100%' }} />
-                        </div>
-                    </Form.Item>
-                    <Form.Item
-                        name="ageMonths"
-                        label="Age (months)"
-                        dependencies={['ageYears']}
-                        rules={[{ validator: () => validateAgeRange() }]}
-                    >
-                        <div data-testid="daycare-field-age-months">
-                            <InputNumber min={0} max={11} precision={0} style={{ width: '100%' }} />
-                        </div>
+                        <Input
+                            data-testid="daycare-field-age-text"
+                            placeholder="e.g. 1y 5m or 18m"
+                        />
                     </Form.Item>
                     <Form.Item
                         name="currency"

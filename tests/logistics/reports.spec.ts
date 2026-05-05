@@ -11,7 +11,7 @@ import {
     type LogisticsReportGraphqlExpected,
     type LogisticsReportFixtures
 } from './reportFixtures';
-import { expect, test } from '../fixtures/logisticsApp.fixture';
+import { expect, test } from '../../fixtures/logisticsApp.fixture';
 
 // --- Module-level inputs (env + external fixtures) ---
 const { uiUsername } = config;
@@ -73,7 +73,7 @@ test.describe('Reports', () => {
         const pmUuid = randomUUID();
         const petMoverName = `${e2eReports.petMoverNamePrefix}${pmUuid}`;
         const petMoverCode = e2eReports.petMoverCodeFromUuid(pmUuid);
-        let petMoverCodeForTeardown: string | undefined;
+        const cleanup = { petMoverCode: undefined as string | undefined };
 
         try {
             await logisticsApp.navigationSidebar.clickMenuItem(MENU_ITEM.PET_MOVERS);
@@ -81,7 +81,7 @@ test.describe('Reports', () => {
                 name: petMoverName,
                 code: petMoverCode,
             });
-            petMoverCodeForTeardown = petMoverCode;
+            cleanup.petMoverCode = petMoverCode;
 
             // Reports form (incl. `data-testid="pet-reports-pet-mover"`) is used as PetAccountant; admin only for PetMovers precondition.
             await logisticsApp.loginAsPetAccountant();
@@ -212,10 +212,10 @@ test.describe('Reports', () => {
                 expect(stat3.size).toBeGreaterThan(0);
             }
         } finally {
-            if (petMoverCodeForTeardown) {
+            if (cleanup.petMoverCode) {
                 try {
                     await logisticsApp.loginAsPetAdmin();
-                    await logisticsApp.deletePetMoverByCode(petMoverCodeForTeardown);
+                    await logisticsApp.deletePetMoverByCode(cleanup.petMoverCode);
                 } catch {
                     /* ignore */
                 }

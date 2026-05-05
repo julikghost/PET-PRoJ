@@ -208,6 +208,23 @@ export class Points {
         });
     }
 
+    /**
+     * Full create flow inside Points: open modal, fill all fields, save, assert toast.
+     */
+    async createPoint (values: {
+        code: string;
+        name: string;
+        city: string;
+        kindLabel: string;
+    }): Promise<void> {
+        await test.step(`Create point ${values.code}`, async () => {
+            await this.clickAdd();
+            await this.fillForm(values);
+            await this.saveModal();
+            await expect(this.page.getByText(pointsText.toastCreated).last()).toBeVisible();
+        });
+    }
+
     async saveModal (): Promise<void> {
         await test.step('Save point modal', async () => {
             await this.editDialog().getByRole('button', { name: pointsText.save }).click({ force: true });
@@ -218,6 +235,20 @@ export class Points {
         await test.step(`Edit point ${code}`, async () => {
             await this.root.getByTestId(`point-edit-${code}`).click();
             await this.editDialog().waitFor({ state: 'visible', timeout: 15000 });
+        });
+    }
+
+    async editPoint (code: string, values: { name: string; city: string; kindLabel: string }): Promise<void> {
+        await test.step(`Update point ${code}`, async () => {
+            await this.clickEdit(code);
+            await this.fillCodeNameAndCity({
+                code,
+                name: values.name,
+                city: values.city,
+            });
+            await this.selectKindByLabel(values.kindLabel);
+            await this.saveModal();
+            await expect(this.page.getByText(pointsText.toastUpdated)).toBeVisible();
         });
     }
 
@@ -235,10 +266,26 @@ export class Points {
         });
     }
 
+    async deletePointAndAssertRemoved (code: string): Promise<void> {
+        await test.step(`Delete point ${code} and assert removal`, async () => {
+            await this.clickDelete(code);
+            await this.confirmDeleteInDialog();
+            await expect(this.page.getByText(pointsText.toastDeleted)).toBeVisible();
+            await this.expectNoRowContains(code);
+        });
+    }
+
     async expectRowContains (substring: string): Promise<void> {
         await test.step(`Points table row contains: ${substring}`, async () => {
             const table = this.root.getByTestId('points-table');
             await expect(table.locator('tr').filter({ hasText: substring })).toBeVisible();
+        });
+    }
+
+    async expectRowHasCodeAndName (code: string, name: string): Promise<void> {
+        await test.step(`Points table row has code/name: ${code} / ${name}`, async () => {
+            const table = this.root.getByTestId('points-table');
+            await expect(table.locator('tr').filter({ hasText: code, has: this.page.getByText(name) })).toBeVisible();
         });
     }
 

@@ -4,7 +4,7 @@ import { getCurrentAndTomorrowDateTimes } from '../../utils/date';
 import { E2E_SKIP, e2eRefs, e2eRoutes } from '../../utils/e2eTestData';
 import { petShipping as petShippingText } from '../../utils/text';
 import { points as pointsText } from '../../utils/text';
-import { expect, test } from '../fixtures/logisticsApp.fixture';
+import { expect, test } from '../../fixtures/logisticsApp.fixture';
 
 const { adminUsername, adminPassword } = config;
 
@@ -17,21 +17,20 @@ test.describe('PetShipping', () => {
         const { currentDateTime, tomorrowDateTime } = getCurrentAndTomorrowDateTimes();
         const departure = currentDateTime;
         const arrival = tomorrowDateTime;
-        let pmCode: string | undefined;
-        let pm2Code: string | undefined;
-        let codeFrom: string | undefined;
-        let codeTo: string | undefined;
+        const cleanup = {
+            pmCode: undefined as string | undefined,
+            pm2Code: undefined as string | undefined,
+            codeFrom: undefined as string | undefined,
+            codeTo: undefined as string | undefined,
+        };
 
         try {
-            await logisticsApp.openLogisticsApp();
-            await logisticsApp.loginAsPetAdmin();
-            await logisticsApp.clearPetLogisticsData();
-            await logisticsApp.clearPetMoversStorage();
+            await logisticsApp.ensurePetAdminSessionWithCleanData();
 
             const pm = await logisticsApp.createPetMoverForPetShippingPrecondition();
             const pm2 = await logisticsApp.createPetMoverForPetShippingPrecondition();
-            pmCode = pm.code;
-            pm2Code = pm2.code;
+            cleanup.pmCode = pm.code;
+            cleanup.pm2Code = pm2.code;
 
             await logisticsApp.navigationSidebar.clickMenuItem(MENU_ITEM.POINTS);
             const routes = await logisticsApp.points.createTwoDistinctPointsForRoutes({
@@ -39,8 +38,8 @@ test.describe('PetShipping', () => {
                 from: { ...e2eRoutes.petShipping.from, kindLabel: pointsText.kindHub },
                 to: { ...e2eRoutes.petShipping.to, kindLabel: pointsText.kindHub },
             });
-            codeFrom = routes.codeFrom;
-            codeTo = routes.codeTo;
+            cleanup.codeFrom = routes.codeFrom;
+            cleanup.codeTo = routes.codeTo;
             const { fromLabel, toLabel } = routes;
 
             await logisticsApp.navigationSidebar.clickMenuItem(MENU_ITEM.PET_SHIPPING);
@@ -80,8 +79,8 @@ test.describe('PetShipping', () => {
         } finally {
             await logisticsApp.teardownPetE2eData({
                 petShipRef: shipRef,
-                pointCodes: [codeFrom, codeTo].filter(Boolean) as string[],
-                petMoverCodes: [pmCode, pm2Code].filter(Boolean) as string[],
+                pointCodes: [cleanup.codeFrom, cleanup.codeTo].filter(Boolean) as string[],
+                petMoverCodes: [cleanup.pmCode, cleanup.pm2Code].filter(Boolean) as string[],
             });
         }
     });
