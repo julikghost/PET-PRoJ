@@ -20,3 +20,5 @@ pet-app/node_modules/
 pet-app/dist/
 archive/
 COMMIT_MSG.txt
+pet-logistics.postman_collection.json
+pet-logistics.local.postman_environment.json
