@@ -1,17 +1,12 @@
-import { config } from '../../config-logistics';
 import { MENU_ITEM } from '../../utils/constants';
 import { getCurrentAndTomorrowDateTimes } from '../../utils/date';
-import { E2E_SKIP, e2eRefs, e2eRoutes } from '../../utils/e2eTestData';
+import { e2eRefs, e2eRoutes } from '../../utils/e2eTestData';
 import { petShipping as petShippingText } from '../../utils/text';
 import { points as pointsText } from '../../utils/text';
 import { expect, test } from '../../fixtures/logisticsApp.fixture';
 
-const { adminUsername, adminPassword } = config;
-
 test.describe('PetShipping', () => {
     test('create pet ship after two points, then update and delete', async ({ page, logisticsApp }) => {
-        test.skip(!adminUsername || !adminPassword, E2E_SKIP.LOGISTICS_ADMIN_PET_SHIPPING);
-
         const ts = Date.now();
         const shipRef = e2eRefs.petShip(ts);
         const { currentDateTime, tomorrowDateTime } = getCurrentAndTomorrowDateTimes();

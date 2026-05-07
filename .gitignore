@@ -6,7 +6,7 @@ node_modules/
 /playwright/.cache/
 .history
 .env
-tests/logistics/fixtures.local.json
+fixtures/fixtures.local.json
 allure-results
 storageState/*
 !storageState/.gitkeep

@@ -1,0 +1,814 @@
+openapi: 3.0.3
+info:
+  title: PET Logistics API
+  version: 1.0.0
+  description: |
+    Minimal OpenAPI documentation for the current project API.
+    Backend is implemented in `pet-app/vite-plugin-pet-api.ts`.
+servers:
+  - url: http://localhost:5173
+    description: Local dev server
+
+paths:
+  /api/graphql:
+    post:
+      summary: Reports GraphQL stub
+      description: Accepts GraphQL-style JSON payload and returns stubbed report response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Stub response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      reportEmailQueued:
+                        type: boolean
+                        example: true
+                  jobId:
+                    type: integer
+                    example: 9001
+
+  /api/test/reset:
+    post:
+      summary: Reset in-memory store
+      responses:
+        '200':
+          description: Store reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+
+  /api/test/seed:
+    post:
+      summary: Seed in-memory store
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Store seeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    additionalProperties: true
+
+  /api/points:
+    get:
+      summary: List points
+      responses:
+        '200':
+          description: Points list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Point'
+    post:
+      summary: Create point
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PointInput'
+      responses:
+        '200':
+          description: Created point
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Point'
+        '400':
+          $ref: '#/components/responses/Error400'
+
+  /api/points/{id}:
+    put:
+      summary: Update point
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PointInput'
+      responses:
+        '200':
+          description: Updated point
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Point'
+        '400':
+          $ref: '#/components/responses/Error400'
+    delete:
+      summary: Delete point
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+
+  /api/pet-ships:
+    get:
+      summary: List pet ships
+      responses:
+        '200':
+          description: Pet ships list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PetShip'
+    post:
+      summary: Create pet ship
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PetShipInput'
+      responses:
+        '200':
+          description: Created pet ship
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PetShip'
+        '400':
+          $ref: '#/components/responses/Error400'
+
+  /api/pet-ships/{id}:
+    put:
+      summary: Update pet ship
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PetShipInput'
+      responses:
+        '200':
+          description: Updated pet ship
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PetShip'
+        '400':
+          $ref: '#/components/responses/Error400'
+    delete:
+      summary: Delete pet ship
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+
+  /api/bookings:
+    get:
+      summary: List bookings
+      responses:
+        '200':
+          description: Bookings list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+    post:
+      summary: Create booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingInput'
+      responses:
+        '200':
+          description: Created booking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          $ref: '#/components/responses/Error400'
+
+  /api/bookings/{id}:
+    put:
+      summary: Update booking
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingInput'
+      responses:
+        '200':
+          description: Updated booking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          $ref: '#/components/responses/Error400'
+    delete:
+      summary: Delete booking
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResponse'
+
+  /api/dog-daycares:
+    get:
+      summary: List dog daycares
+      responses:
+        '200':
+          description: Dog daycare list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DogDaycare'
+    post:
+      summary: Create dog daycare
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DogDaycareInput'
+      responses:
+        '200':
+          description: Created dog daycare
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DogDaycare'
+        '400':
+          $ref: '#/components/responses/Error400'
+
+  /api/dog-daycares/{id}:
+    put:
+      summary: Update dog daycare
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DogDaycareInput'
+      responses:
+        '200':
+          description: Updated dog daycare
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DogDaycare'
+        '400':
+          $ref: '#/components/responses/Error400'
+    delete:
+      summary: Delete dog daycare
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResponse'
+
+  /api/pet-seaters:
+    get:
+      summary: List pet seaters
+      responses:
+        '200':
+          description: Pet seaters list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PetSeater'
+    post:
+      summary: Create pet seater
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PetSeaterInput'
+      responses:
+        '200':
+          description: Created pet seater
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PetSeater'
+        '400':
+          $ref: '#/components/responses/Error400'
+
+  /api/pet-seaters/{id}:
+    put:
+      summary: Update pet seater
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PetSeaterInput'
+      responses:
+        '200':
+          description: Updated pet seater
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PetSeater'
+        '400':
+          $ref: '#/components/responses/Error400'
+    delete:
+      summary: Delete pet seater
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+
+  /api/pet-movers:
+    get:
+      summary: List pet movers
+      responses:
+        '200':
+          description: Pet movers list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PetMover'
+    post:
+      summary: Create pet mover
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PetMoverInput'
+      responses:
+        '200':
+          description: Created pet mover
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PetMover'
+        '400':
+          $ref: '#/components/responses/Error400'
+    put:
+      summary: Replace all pet movers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/PetMover'
+      responses:
+        '200':
+          description: Replaced list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PetMover'
+
+  /api/pet-movers/{id}:
+    put:
+      summary: Update pet mover
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PetMoverInput'
+      responses:
+        '200':
+          description: Updated pet mover
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PetMover'
+        '400':
+          $ref: '#/components/responses/Error400'
+    delete:
+      summary: Delete pet mover
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResponse'
+
+components:
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    Error400:
+      description: Validation/business error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    OkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    DeletedResponse:
+      type: object
+      properties:
+        id:
+          type: string
+      required:
+        - id
+
+    Point:
+      type: object
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        city:
+          type: string
+        kind:
+          type: string
+          enum: [hub, stop, airport]
+      required: [id, code, name, city, kind]
+
+    PointInput:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        city:
+          type: string
+        kind:
+          type: string
+          enum: [hub, stop, airport]
+      required: [code, name, city, kind]
+
+    PetShip:
+      type: object
+      properties:
+        id:
+          type: string
+        refCode:
+          type: string
+        fromPointId:
+          type: string
+        toPointId:
+          type: string
+        departure:
+          type: string
+        arrival:
+          type: string
+        petMover:
+          type: string
+        currency:
+          type: string
+          enum: [EUR, USD]
+        cars:
+          type: string
+        drivers:
+          type: string
+        status:
+          type: string
+          enum: [planned, active, done]
+      required: [id, refCode, fromPointId, toPointId, departure, arrival, petMover, currency, cars, drivers, status]
+
+    PetShipInput:
+      type: object
+      properties:
+        refCode:
+          type: string
+        fromPointId:
+          type: string
+        toPointId:
+          type: string
+        departure:
+          type: string
+        arrival:
+          type: string
+        petMover:
+          type: string
+        currency:
+          type: string
+          enum: [EUR, USD]
+        cars:
+          type: string
+        drivers:
+          type: string
+        status:
+          type: string
+          enum: [planned, active, done]
+      required: [refCode, fromPointId, toPointId, departure, arrival, petMover, currency, cars, drivers, status]
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+        refCode:
+          type: string
+        petShipId:
+          type: string
+        date:
+          type: string
+        clientFirstName:
+          type: string
+        clientLastName:
+          type: string
+        petLabels:
+          type: array
+          items:
+            type: string
+        weightKg:
+          type: number
+        price:
+          type: number
+        currency:
+          type: string
+          enum: [EUR, USD]
+        paymentMethod:
+          type: string
+          enum: [card, cash, petpay]
+        billingCurrency:
+          type: string
+          enum: [cur-eur, cur-usd]
+      required: [id, refCode, petShipId, date, clientFirstName, clientLastName, petLabels, weightKg, price, currency, paymentMethod, billingCurrency]
+
+    BookingInput:
+      type: object
+      properties:
+        refCode:
+          type: string
+        petShipId:
+          type: string
+        date:
+          type: string
+        clientFirstName:
+          type: string
+        clientLastName:
+          type: string
+        petLabels:
+          type: array
+          items:
+            type: string
+        weightKg:
+          type: number
+        paymentMethod:
+          type: string
+          enum: [card, cash, petpay]
+      required: [refCode, petShipId, date, clientFirstName, clientLastName, petLabels, weightKg, paymentMethod]
+
+    DogDaycare:
+      type: object
+      properties:
+        id:
+          type: string
+        refCode:
+          type: string
+        bookingRefCode:
+          type: string
+        startDate:
+          type: string
+          example: '2026-05-10'
+        endDate:
+          type: string
+          example: '2026-05-11'
+        clientFirstName:
+          type: string
+        clientLastName:
+          type: string
+        dogName:
+          type: string
+        breed:
+          type: string
+        ageYears:
+          type: integer
+        ageMonths:
+          type: integer
+        hoursPerDay:
+          type: integer
+          enum: [2, 4, 6, 8, 12]
+        status:
+          type: string
+          enum: [scheduled, checked-in, active, checked-out]
+        petSeaterId:
+          type: string
+          nullable: true
+        petPhotoUrl:
+          type: string
+          nullable: true
+        petSeaterName:
+          type: string
+        notes:
+          type: string
+        price:
+          type: number
+        currency:
+          type: string
+          enum: [EUR, USD]
+      required: [id, refCode, bookingRefCode, startDate, endDate, clientFirstName, clientLastName, dogName, breed, ageYears, ageMonths, hoursPerDay, status, petSeaterName, notes, price, currency]
+
+    DogDaycareInput:
+      type: object
+      properties:
+        refCode:
+          type: string
+        bookingRefCode:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        clientFirstName:
+          type: string
+        clientLastName:
+          type: string
+        dogName:
+          type: string
+        breed:
+          type: string
+        ageYears:
+          type: integer
+        ageMonths:
+          type: integer
+        hoursPerDay:
+          type: integer
+        status:
+          type: string
+          enum: [scheduled, checked-in, active, checked-out]
+        petSeaterId:
+          type: string
+          nullable: true
+        petPhotoUrl:
+          type: string
+          nullable: true
+        notes:
+          type: string
+        currency:
+          type: string
+          enum: [EUR, USD]
+      required: [refCode, bookingRefCode, startDate, endDate, clientFirstName, clientLastName, dogName, breed, ageYears, ageMonths, hoursPerDay, status, notes, currency]
+
+    PetSeater:
+      type: object
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        active:
+          type: boolean
+      required: [id, code, name, phone, active]
+
+    PetSeaterInput:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        active:
+          type: boolean
+      required: [code, name, phone, active]
+
+    PetMover:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        active:
+          type: boolean
+        currency:
+          type: string
+          enum: [EUR, USD]
+        cars:
+          type: string
+        drivers:
+          type: string
+      required: [id, name, code, active, currency, cars, drivers]
+
+    PetMoverInput:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        active:
+          type: boolean
+        currency:
+          type: string
+          enum: [EUR, USD]
+        cars:
+          type: string
+        drivers:
+          type: string
+      required: [name, code, active, currency, cars, drivers]

@@ -98,6 +98,32 @@ export class PetMovers {
         });
     }
 
+    async createPetMover (values: {
+        name: string;
+        code: string;
+        active?: boolean;
+        currency?: 'EUR' | 'USD';
+    }): Promise<void> {
+        await test.step(`Create PetMover ${values.code}`, async () => {
+            await this.clickAdd();
+            await this.fillForm(values);
+            await this.saveModal();
+        });
+    }
+
+    async updatePetMover (code: string, values: {
+        name: string;
+        code: string;
+        active?: boolean;
+        currency?: 'EUR' | 'USD';
+    }): Promise<void> {
+        await test.step(`Update PetMover ${code}`, async () => {
+            await this.clickEdit(code);
+            await this.fillForm(values);
+            await this.saveModal();
+        });
+    }
+
     async saveModal (): Promise<void> {
         await test.step('Save PetMover modal', async () => {
             await this.editDialog().getByRole('button', { name: petMoversText.save }).click();
@@ -137,6 +163,30 @@ export class PetMovers {
         await test.step(`Table row contains: ${substring}`, async () => {
             const table = this.root.getByTestId('pet-movers-table');
             await expect(table.locator('tr').filter({ hasText: substring })).toBeVisible();
+        });
+    }
+
+    async expectCreatedPetMoverVisible (name: string, code: string): Promise<void> {
+        await test.step(`PetMover row visible after create: ${code}`, async () => {
+            await this.expectRowContains(name);
+            await this.expectRowContains(code);
+        });
+    }
+
+    async expectUpdatedAndDeletePetMover (values: {
+        code: string;
+        updatedName: string;
+        updatedCurrency: 'EUR' | 'USD';
+        activeLabel?: 'Yes' | 'No';
+    }): Promise<void> {
+        await test.step(`Assert updated row and delete PetMover ${values.code}`, async () => {
+            await this.expectRowContains(values.updatedName);
+            await this.expectRowContains(values.updatedCurrency);
+            await this.expectRowContains(values.activeLabel ?? 'No');
+            await this.clickDelete(values.code);
+            await this.confirmDeleteInDialog();
+            await expect(this.page.getByText(petMoversText.toastDeleted).first()).toBeVisible();
+            await this.expectNoRowContains(values.updatedName);
         });
     }
 

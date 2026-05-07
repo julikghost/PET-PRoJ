@@ -1,0 +1,22 @@
+---
+description: Keep all E2E fixtures in root fixtures folder
+alwaysApply: true
+---
+
+# E2E Fixtures Location
+
+- Store all E2E fixtures only in the root `fixtures/` folder.
+- Do not add fixture files under `tests/**` (for example `tests/fixtures` or `tests/logistics/fixtures`).
+- When moving or adding fixtures, update all imports/paths to use `fixtures/...`.
+- Keep fixture naming consistent:
+  - runtime/local fixture data: `fixtures/*.json`
+  - fixture helpers/modules: `fixtures/*.ts`
+  - Playwright fixture wrappers: `fixtures/*.fixture.ts`
+
+## Examples
+
+- ✅ `fixtures/reportFixtures.ts`
+- ✅ `fixtures/fixtures.local.json`
+- ✅ `fixtures/logisticsApp.fixture.ts`
+- ❌ `tests/logistics/fixtures/reportFixtures.ts`
+- ❌ `tests/fixtures/fixtures.local.json`

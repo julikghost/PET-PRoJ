@@ -14,7 +14,7 @@ export const E2E_SKIP = {
     REPORTS_ADMIN_AND_ACCOUNTANT:
         'Set LOGISTICS_ADMIN_* (create PetMover in PetMovers) and LOGISTICS_ACCOUNTANT_* (Reports UI is for PetAccountant / financial manager).',
     REPORTS_FIXTURES_NDA:
-        'NDA: add tests/logistics/fixtures.local.json (see fixtures.example.json) or LOGISTICS_REPORT_FIXTURES_JSON',
+        'NDA: add fixtures/fixtures.local.json (see fixtures/fixtures.example.json) or LOGISTICS_REPORT_FIXTURES_JSON',
     PET_STUB_LOGIN:
         'PET stub login only (E2E_PET_STUB_LOGIN / E2E_DOCKER, or local identifier + localhost)',
     BASE_URL_EMPTY: 'LOGISTICS_BASE_CLIENT_URL is empty',

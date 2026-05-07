@@ -10,13 +10,13 @@ import {
     loadLogisticsReportFixtures,
     type LogisticsReportGraphqlExpected,
     type LogisticsReportFixtures
-} from './reportFixtures';
+} from '../../fixtures/reportFixtures';
 import { expect, test } from '../../fixtures/logisticsApp.fixture';
 
 // --- Module-level inputs (env + external fixtures) ---
 const { uiUsername } = config;
 
-const fixtures: LogisticsReportFixtures | null = loadLogisticsReportFixtures();
+const fixtures: LogisticsReportFixtures = loadLogisticsReportFixtures();
 
 // --- Shapes for parsing the persisted GraphQL request body (see `emailSend.requestJsonPath`) ---
 interface TicketReportRequestVars {
@@ -37,9 +37,6 @@ interface GraphqlRequestBody {
 }
 
 test.describe('Reports', () => {
-    // No suite runs without fixture data (keeps NDA payloads out of git).
-    test.skip(!fixtures, E2E_SKIP.REPORTS_FIXTURES_NDA);
-
     test('Send report by email with updated filters', async ({ page, logisticsApp }) => {
         test.skip(
             !config.adminUsername
@@ -50,7 +47,7 @@ test.describe('Reports', () => {
         );
 
         // --- Fixture unpack: labels, id maps, and expected GraphQL fragment ---
-        const fx = fixtures as LogisticsReportFixtures;
+        const fx = fixtures;
         const {
             uiPaymentMethods,
             uiCurrencies,

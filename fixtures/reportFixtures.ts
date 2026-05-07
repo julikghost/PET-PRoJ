@@ -40,6 +40,35 @@ export interface LogisticsReportFixtures {
     graphql: LogisticsReportGraphqlExpected;
 }
 
+export const DEFAULT_LOGISTICS_REPORT_FIXTURES: LogisticsReportFixtures = {
+    reportPetMover: 'PetMover (PET-1)',
+    uiPaymentMethods: ['Card', 'Cash', 'PetPay'],
+    uiCurrencies: ['USD', 'EUR'],
+    paymentCodeToName: {
+        card: 'Card',
+        cash: 'Cash',
+        petpay: 'PetPay',
+    },
+    currencyIdToName: {
+        'cur-usd': 'USD',
+        'cur-eur': 'EUR',
+    },
+    petMoverIdsExpected: ['carrier-pet-1'],
+    graphql: {
+        operationName: 'EmailTicketsReport',
+        queryContains: 'EmailTicketsReport',
+        variables: {
+            req: {
+                paymentTypeNames: ['Card', 'Cash', 'PetPay'],
+                targetColumnForDateSearch: 'departureDate',
+                fromDateDay: 'CURRENT_MONTH_START',
+                toDateDay: 'CURRENT_MONTH_END',
+                currencyNames: ['USD', 'EUR'],
+            },
+        },
+    },
+};
+
 function parseSubstitutionMap (): Record<string, string> {
     const raw = process.env.E2E_FIXTURE_SUBSTITUTIONS_JSON?.trim();
     if (!raw) {
@@ -110,7 +139,7 @@ function parseLogisticsReportFixtures (raw: string): LogisticsReportFixtures {
     return applyFixtureSubstitutions(data) as LogisticsReportFixtures;
 }
 
-export function loadLogisticsReportFixtures (): LogisticsReportFixtures | null {
+export function loadLogisticsReportFixtures (): LogisticsReportFixtures {
     const fromEnv = process.env.LOGISTICS_REPORT_FIXTURES_JSON?.trim();
     if (fromEnv) {
         return parseLogisticsReportFixtures(fromEnv);
@@ -120,5 +149,5 @@ export function loadLogisticsReportFixtures (): LogisticsReportFixtures | null {
         return parseLogisticsReportFixtures(fs.readFileSync(localPath, 'utf8'));
     }
 
-    return null;
+    return applyFixtureSubstitutions(DEFAULT_LOGISTICS_REPORT_FIXTURES) as LogisticsReportFixtures;
 }

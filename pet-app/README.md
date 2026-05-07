@@ -119,12 +119,12 @@ Playwright runs with `workers: 1` in `playwright.config.ts`, which keeps shared 
 Use one option:
 
 - `LOGISTICS_REPORT_FIXTURES_JSON` environment variable, or
-- local gitignored file `tests/logistics/fixtures.local.json`.
+- local gitignored file `fixtures/fixtures.local.json`.
 
-Starter template: `tests/logistics/fixtures.example.json`.
+Starter template: `fixtures/fixtures.example.json`.
 
 ## Common issues
 
 - **Port mismatch**: if PET starts on `5174`, update root `.env` URLs accordingly.
 - **Stale session**: delete `storageState/session.json` and rerun `logistics_session`.
-- **Reports skipped**: add `fixtures.local.json` or `LOGISTICS_REPORT_FIXTURES_JSON`.
+- **Reports skipped**: add `fixtures/fixtures.local.json` or `LOGISTICS_REPORT_FIXTURES_JSON`.
