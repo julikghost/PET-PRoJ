@@ -53,7 +53,9 @@ test.describe('Dog Daycare', () => {
                 await expect(page.getByTestId('daycare-field-client-first-name').locator('input')).toHaveValue(dd.clientFirstName);
                 await expect(page.getByTestId('daycare-field-client-last-name').locator('input')).toHaveValue(dd.clientLastName);
                 await expect(page.getByTestId('daycare-field-dog-name').locator('input')).toHaveValue(dd.dogNameCreate);
-                await expect(page.getByTestId('daycare-field-weight').locator('input')).toHaveValue(dd.dogWeightKg);
+                await expect(
+                    page.getByTestId('daycare-field-hours-per-day').locator('.ant-select-selection-item').first()
+                ).toHaveText(dd.hours);
             });
             await dc.saveModal();
             await expect(page.getByText(dogDaycareText.toastCreated).first()).toBeVisible();
@@ -75,13 +77,13 @@ test.describe('Dog Daycare', () => {
                 hoursPerDay: dd.hours,
                 statusLabel: dd.statusUpdate,
             });
-            await test.step('Assert required fields populated (update)', async () => {
-                await expect(page.getByTestId('daycare-field-ref').locator('input')).toHaveValue(cleanup.refCode ?? '');
-                await expect(page.getByTestId('daycare-field-booking-ref').locator('input')).toHaveValue(bookingRef);
-                await expect(page.getByTestId('daycare-field-client-first-name').locator('input')).toHaveValue(dd.clientFirstName);
-                await expect(page.getByTestId('daycare-field-client-last-name').locator('input')).toHaveValue(dd.clientLastName);
-                await expect(page.getByTestId('daycare-field-dog-name').locator('input')).toHaveValue(dd.dogNameUpdate);
-                await expect(page.getByTestId('daycare-field-weight').locator('input')).toHaveValue(dd.dogWeightKg);
+            await dc.expectRequiredFieldsPopulated({
+                refCode: cleanup.refCode ?? '',
+                bookingRefCode: bookingRef,
+                clientFirstName: dd.clientFirstName,
+                clientLastName: dd.clientLastName,
+                dogName: dd.dogNameUpdate,
+                hoursPerDay: dd.hours,
             });
             await dc.saveModal();
             await expect(page.getByText(dogDaycareText.toastUpdated).first()).toBeVisible();

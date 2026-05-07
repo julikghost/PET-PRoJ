@@ -26,6 +26,7 @@ import {
     computeDogDaycarePrice,
     normalizeDogDaycareHoursPerDay,
 } from '../utils/pricing';
+import { petApi } from '../api/petApi';
 
 dayjs.extend(customParseFormat);
 
@@ -370,11 +371,32 @@ export type PetLogisticsContextValue = {
 const PetLogisticsContext = createContext<PetLogisticsContextValue | null>(null);
 
 export function PetLogisticsProvider ({ children }: { children: ReactNode }): JSX.Element {
-    const [state, setState] = useState<StoreState>(loadState);
+    const [state, setState] = useState<StoreState>(emptyState);
 
     useEffect(() => {
-        localStorage.setItem(PET_LOGISTICS_STORAGE_KEY, JSON.stringify(state));
-    }, [state]);
+        let alive = true;
+        void Promise.all([
+            petApi.points.list(),
+            petApi.petShips.list(),
+            petApi.bookings.list(),
+            petApi.dogDaycares.list(),
+            petApi.petSeaters.list(),
+        ]).then(([points, petShips, bookings, dogDaycares, petSeaters]) => {
+            if (!alive) {
+                return;
+            }
+            setState({ points, petShips, bookings, dogDaycares, petSeaters });
+        }).catch(() => {
+            if (!alive) {
+                return;
+            }
+            const fallback = loadState();
+            setState(fallback);
+        });
+        return () => {
+            alive = false;
+        };
+    }, []);
 
     const getPoint = useCallback(
         (id: string) => state.points.find((p) => p.id === id),
@@ -444,6 +466,20 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
             return { ...prev, points };
         });
 
+        if (accepted) {
+            const payload = {
+                code: full.code,
+                name: full.name,
+                city: full.city,
+                kind: full.kind,
+            };
+            if (row.id) {
+                void petApi.points.update(id, payload).catch((e: unknown) => toast.error(String(e)));
+            } else {
+                void petApi.points.create({ id, ...payload }).catch((e: unknown) => toast.error(String(e)));
+            }
+        }
+
         return accepted;
     }, []);
 
@@ -460,6 +496,10 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
 
             return { ...prev, points: prev.points.filter((p) => p.id !== id) };
         });
+
+        if (accepted) {
+            void petApi.points.remove(id).catch((e: unknown) => toast.error(String(e)));
+        }
 
         return accepted;
     }, []);
@@ -512,6 +552,26 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
                 return { ...prev, petShips };
             });
 
+            if (accepted) {
+                const payload = {
+                    refCode: full.refCode,
+                    fromPointId: full.fromPointId,
+                    toPointId: full.toPointId,
+                    departure: full.departure,
+                    arrival: full.arrival,
+                    petMover: full.petMover,
+                    currency: full.currency,
+                    cars: full.cars,
+                    drivers: full.drivers,
+                    status: full.status,
+                };
+                if (row.id) {
+                    void petApi.petShips.update(id, payload).catch((e: unknown) => toast.error(String(e)));
+                } else {
+                    void petApi.petShips.create({ id, ...payload }).catch((e: unknown) => toast.error(String(e)));
+                }
+            }
+
             return accepted;
         },
         []
@@ -530,6 +590,10 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
 
             return { ...prev, petShips: prev.petShips.filter((s) => s.id !== id) };
         });
+
+        if (accepted) {
+            void petApi.petShips.remove(id).catch((e: unknown) => toast.error(String(e)));
+        }
 
         return accepted;
     }, []);
@@ -605,6 +669,24 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
                 return { ...prev, bookings };
             });
 
+            if (accepted) {
+                const payload = {
+                    refCode: row.refCode.trim(),
+                    petShipId: row.petShipId,
+                    date: row.date,
+                    clientFirstName: row.clientFirstName.trim(),
+                    clientLastName: row.clientLastName.trim(),
+                    petLabels: row.petLabels.map((s) => s.trim()).filter(Boolean),
+                    weightKg: row.weightKg,
+                    paymentMethod: row.paymentMethod,
+                };
+                if (row.id) {
+                    void petApi.bookings.update(id, payload).catch((e: unknown) => toast.error(String(e)));
+                } else {
+                    void petApi.bookings.create({ id, ...payload }).catch((e: unknown) => toast.error(String(e)));
+                }
+            }
+
             return accepted;
         },
         []
@@ -615,6 +697,7 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
             ...prev,
             bookings: prev.bookings.filter((b) => b.id !== id),
         }));
+        void petApi.bookings.remove(id).catch((e: unknown) => toast.error(String(e)));
     }, []);
 
     const upsertPetSeater = useCallback((row: Omit<PetSeaterRecord, 'id'> & { id?: string }): boolean => {
@@ -656,6 +739,20 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
             return { ...prev, petSeaters, dogDaycares };
         });
 
+        if (accepted) {
+            const payload = {
+                code: full.code,
+                name: full.name,
+                phone: full.phone,
+                active: full.active,
+            };
+            if (row.id) {
+                void petApi.petSeaters.update(id, payload).catch((e: unknown) => toast.error(String(e)));
+            } else {
+                void petApi.petSeaters.create({ id, ...payload }).catch((e: unknown) => toast.error(String(e)));
+            }
+        }
+
         return accepted;
     }, []);
 
@@ -672,6 +769,10 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
 
             return { ...prev, petSeaters: prev.petSeaters.filter((s) => s.id !== id) };
         });
+
+        if (accepted) {
+            void petApi.petSeaters.remove(id).catch((e: unknown) => toast.error(String(e)));
+        }
 
         return accepted;
     }, []);
@@ -811,6 +912,36 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
                 return { ...prev, dogDaycares };
             });
 
+            if (accepted) {
+                const payload = {
+                    refCode: row.refCode.trim(),
+                    bookingRefCode: row.bookingRefCode.trim(),
+                    startDate: row.startDate.trim(),
+                    endDate: row.endDate.trim(),
+                    clientFirstName: row.clientFirstName.trim(),
+                    clientLastName: row.clientLastName.trim(),
+                    dogName: row.dogName.trim(),
+                    breed: row.breed.trim(),
+                    ageYears: Number(row.ageYears),
+                    ageMonths: Number(row.ageMonths),
+                    hoursPerDay: Number(row.hoursPerDay),
+                    status: row.status,
+                    petSeaterId: typeof row.petSeaterId === 'string' && row.petSeaterId.trim()
+                        ? row.petSeaterId.trim()
+                        : undefined,
+                    petPhotoUrl: typeof row.petPhotoUrl === 'string' && row.petPhotoUrl.trim()
+                        ? row.petPhotoUrl
+                        : undefined,
+                    notes: row.notes.trim(),
+                    currency: row.currency === 'USD' ? 'USD' : 'EUR',
+                } as Omit<DogDaycareRecord, 'id' | 'petSeaterName' | 'price'>;
+                if (row.id) {
+                    void petApi.dogDaycares.update(id, payload).catch((e: unknown) => toast.error(String(e)));
+                } else {
+                    void petApi.dogDaycares.create({ id, ...payload }).catch((e: unknown) => toast.error(String(e)));
+                }
+            }
+
             return accepted;
         },
         []
@@ -821,6 +952,7 @@ export function PetLogisticsProvider ({ children }: { children: ReactNode }): JS
             ...prev,
             dogDaycares: prev.dogDaycares.filter((d) => d.id !== id),
         }));
+        void petApi.dogDaycares.remove(id).catch((e: unknown) => toast.error(String(e)));
     }, []);
 
     const value = useMemo<PetLogisticsContextValue>(

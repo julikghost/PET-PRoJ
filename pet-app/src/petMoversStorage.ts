@@ -1,5 +1,6 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { PetShipCurrency } from './types/petLogistics';
+import { petApi } from './api/petApi';
 
 export type PetMoverRow = {
     id: string;
@@ -45,20 +46,7 @@ function parsePetMoverRow (x: unknown): PetMoverRow | null {
 }
 
 export function loadPetMovers (): PetMoverRow[] {
-    try {
-        const raw = localStorage.getItem(PET_MOVERS_STORAGE_KEY);
-        if (!raw) {
-            return [];
-        }
-        const p = JSON.parse(raw) as unknown;
-        if (!Array.isArray(p)) {
-            return [];
-        }
-
-        return p.map(parsePetMoverRow).filter((r): r is PetMoverRow => r !== null);
-    } catch {
-        return [];
-    }
+    return [];
 }
 
 /**
@@ -83,9 +71,33 @@ export function petMoverSelectOptions (
  */
 export function usePetMovers (): [PetMoverRow[], Dispatch<SetStateAction<PetMoverRow[]>>] {
     const [rows, setRows] = useState<PetMoverRow[]>(loadPetMovers);
+    const didHydrate = useRef(false);
 
     useEffect(() => {
-        localStorage.setItem(PET_MOVERS_STORAGE_KEY, JSON.stringify(rows));
+        let alive = true;
+        void petApi.petMovers.list()
+            .then((items) => {
+                if (!alive) {
+                    return;
+                }
+                const safe = items.map(parsePetMoverRow).filter((r): r is PetMoverRow => r !== null);
+                setRows(safe);
+                didHydrate.current = true;
+            })
+            .catch(() => {
+                didHydrate.current = true;
+            });
+
+        return () => {
+            alive = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!didHydrate.current) {
+            return;
+        }
+        void petApi.petMovers.replaceAll(rows).catch(() => undefined);
     }, [rows]);
 
     return [rows, setRows];

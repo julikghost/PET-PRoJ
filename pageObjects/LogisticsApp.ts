@@ -236,14 +236,26 @@ export class LogisticsApp {
     /** Clears persisted Points / PetShipping / Booking demo data (`pet-logistics-v1`). */
     async clearPetLogisticsData (): Promise<void> {
         await test.step('Clear PET logistics local data', async () => {
-            await this.page.evaluate(() => localStorage.removeItem('pet-logistics-v1'));
+            await this.page.evaluate(async () => {
+                await fetch('/api/test/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: '{}',
+                });
+            });
         });
     }
 
     /** Clears PetMovers directory storage (`pet-movers-v1`). */
     async clearPetMoversStorage (): Promise<void> {
         await test.step('Clear PET PetMovers local data', async () => {
-            await this.page.evaluate(() => localStorage.removeItem('pet-movers-v1'));
+            await this.page.evaluate(async () => {
+                await fetch('/api/test/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: '{}',
+                });
+            });
         });
     }
 

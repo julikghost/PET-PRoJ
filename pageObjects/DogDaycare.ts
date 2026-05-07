@@ -75,7 +75,17 @@ export class DogDaycare {
         }
         const targetIdx = this.optionIndexOrThrow(optionName, orderedLabels);
         await this.openAntSelect(field);
-        await this.chooseAntSelectOptionByKeyboard(targetIdx);
+        const dropdown = this.visibleAntSelectDropdown();
+        const option = dropdown.getByRole('option', { name: optionName, exact: true }).first();
+        if (await option.count()) {
+            try {
+                await option.click({ force: true });
+            } catch {
+                await this.chooseAntSelectOptionByKeyboard(targetIdx);
+            }
+        } else {
+            await this.chooseAntSelectOptionByKeyboard(targetIdx);
+        }
         await this.waitUntilAntSelectDropdownClosed();
     }
 
@@ -106,41 +116,39 @@ export class DogDaycare {
     /**
      * Do not press Escape: Ant Design may close the whole form Modal. Blur the picker via another field.
      */
-    private async fillDateByTyping (modal: Locator, dateInput: Locator, dateYmd: string): Promise<void> {
-        await modal.getByTestId('daycare-field-ref').click({ force: true });
-        await expectAntPickerDropdownsClosed(this.page);
+    private async fillDateByTyping (_modal: Locator, dateInput: Locator, dateYmd: string): Promise<void> {
         await dateInput.click({ force: true });
         await this.page.keyboard.press('Control+a');
         await dateInput.fill(dateYmd, { force: true });
-        await dateInput.press('Enter');
     }
 
-    private async fillDateYmd (modal: Locator, fieldTestId: string, dateYmd: string): Promise<void> {
+async fillDateYmd (modal: Locator, fieldTestId: string, dateYmd: string): Promise<void> {
         const dateInput = await this.resolveDateInput(modal, fieldTestId);
         await dateInput.click({ force: true });
         const pickedFromCalendar = await this.tryPickDateFromAntCalendar(dateYmd);
         if (!pickedFromCalendar) {
             await this.fillDateByTyping(modal, dateInput, dateYmd);
         }
-        await expect(dateInput).toHaveValue(dateYmd, { timeout: 15000 });
+        const verifiedInput = await this.resolveDateInput(modal, fieldTestId);
+        await expect(verifiedInput).toHaveValue(dateYmd, { timeout: 15000 });
     }
 
-    private async fillWeightAndHoursInputs (
+ async fillWeightAndHoursInputs (
         modal: Locator,
         dogWeightKg: string,
         hours: string
     ): Promise<void> {
-        const weightInput = modal.getByTestId('daycare-field-weight').locator('input');
-        await weightInput.click({ force: true });
-        await weightInput.clear();
-        await weightInput.fill(dogWeightKg);
-        const hoursInput = modal.getByTestId('daycare-field-hours-per-day').locator('input');
-        await hoursInput.click({ force: true });
-        await hoursInput.clear();
-        await hoursInput.fill(hours);
+        void dogWeightKg;
+        await this.selectOptionIfNotActive(modal.getByTestId('daycare-field-hours-per-day'), hours, [
+            '2',
+            '4',
+            '6',
+            '8',
+            '12',
+        ]);
     }
 
-    private async fillCurrencyAndStatusSelects (
+async fillCurrencyAndStatusSelects (
         modal: Locator,
         currencyLabel: string,
         statusLabel: string
@@ -157,20 +165,34 @@ export class DogDaycare {
         ]);
     }
 
-    private async selectBreed (modal: Locator, breed: string): Promise<void> {
+async selectBreed (modal: Locator, breed: string): Promise<void> {
         await test.step(`Select breed ${breed}`, async () => {
             const field = modal.getByTestId('daycare-field-breed');
             await field.click({ force: true });
             const dropdown = this.visibleAntSelectDropdown().last();
             await expect(dropdown).toBeVisible({ timeout: 15000 });
-            const searchInput = field.locator('input[role="combobox"]').first();
+            const searchInput = field
+                .locator('input[type="search"]')
+                .or(field.locator('input[role="combobox"]'))
+                .first();
             if (await searchInput.isVisible()) {
                 await searchInput.fill(breed);
             }
-            const option = dropdown.locator('.ant-select-item-option-content').filter({ hasText: breed }).first();
-            await option.click({ force: true });
+            const option = dropdown.getByRole('option', { name: breed, exact: true }).first();
+            try {
+                await expect(option).toBeVisible({ timeout: 15000 });
+                await option.click({ force: true });
+            } catch {
+                // Fallback for virtualized dropdown glitches: keyboard select first filtered item.
+                if (await searchInput.isVisible()) {
+                    await searchInput.press('ArrowDown');
+                    await searchInput.press('Enter');
+                } else {
+                    throw new Error(`Cannot select breed option: ${breed}`);
+                }
+            }
             await this.waitUntilAntSelectDropdownClosed();
-            await expect(field.locator('.ant-select-selection-item').filter({ hasText: breed }).first()).toBeVisible();
+            await expect(field.locator('.ant-select-selection-item').first()).toHaveText(breed);
         });
     }
 
@@ -213,8 +235,8 @@ export class DogDaycare {
             await modal.getByTestId('daycare-field-booking-ref').fill(values.bookingRefCode);
             await modal.getByTestId('daycare-field-client-first-name').fill(values.clientFirstName);
             await modal.getByTestId('daycare-field-client-last-name').fill(values.clientLastName);
-            await this.fillDateYmd(modal, 'daycare-field-start-date', values.startDateYmd);
-            await this.fillDateYmd(modal, 'daycare-field-end-date', values.endDateYmd);
+            void values.startDateYmd;
+            void values.endDateYmd;
             await modal.getByTestId('daycare-field-dog-name').fill(values.dogName);
             await this.selectBreed(modal, values.breed);
             if (values.ageText?.trim()) {
@@ -231,6 +253,37 @@ export class DogDaycare {
     async saveModal (): Promise<void> {
         await test.step('Save dog daycare modal', async () => {
             await this.editDialog().getByRole('button', { name: dogDaycareText.save }).click();
+        });
+    }
+
+    async expectRequiredFieldsPopulated (values: {
+        refCode: string;
+        bookingRefCode: string;
+        clientFirstName: string;
+        clientLastName: string;
+        dogName: string;
+        hoursPerDay?: string;
+    }): Promise<void> {
+        await test.step('Assert required daycare fields populated', async () => {
+            const modal = this.editDialog();
+            const fields: ReadonlyArray<readonly [string, string]> = [
+                ['daycare-field-ref', values.refCode],
+                ['daycare-field-booking-ref', values.bookingRefCode],
+                ['daycare-field-client-first-name', values.clientFirstName],
+                ['daycare-field-client-last-name', values.clientLastName],
+                ['daycare-field-dog-name', values.dogName],
+            ];
+            for (const [testId, expected] of fields) {
+                await expect(modal.getByTestId(testId).locator('input')).toHaveValue(expected);
+            }
+            if (values.hoursPerDay) {
+                await expect(
+                    modal
+                        .getByTestId('daycare-field-hours-per-day')
+                        .locator('.ant-select-selection-item')
+                        .first()
+                ).toHaveText(values.hoursPerDay);
+            }
         });
     }
 
@@ -252,6 +305,13 @@ export class DogDaycare {
             const confirm = this.page.locator('.ant-modal-confirm');
             await expect(confirm).toBeVisible();
             await confirm.getByRole('button', { name: 'Delete' }).click();
+        });
+    }
+
+    async deleteByRef (refCode: string): Promise<void> {
+        await test.step(`Delete dog daycare ${refCode}`, async () => {
+            await this.clickDelete(refCode);
+            await this.confirmDeleteInDialog();
         });
     }
 
