@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHmac } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Connect, Plugin, PreviewServer } from 'vite';
 import type {
@@ -10,6 +11,14 @@ import type {
     PointRecord,
 } from './src/types/petLogistics';
 import { PetStore, type PetMoverRow } from './src/server/petStore';
+
+type PetRole = 'PetAdmin' | 'PetUser' | 'PetAccountant';
+type JwtPayload = {
+    sub: string;
+    role: PetRole;
+    exp: number;
+    iat: number;
+};
 
 /** Connect stores the middleware stack on `.stack` (used to run SPA fallback before static `sirv`). */
 type ConnectWithStack = Connect.Server & {
@@ -70,6 +79,75 @@ function previewSpaFallbackMiddleware (indexPath: string): Connect.NextHandleFun
     };
 }
 
+function normalizeEnvValue (v: unknown): string | undefined {
+    if (typeof v !== 'string') {
+        return undefined;
+    }
+    const t = v.trim();
+    return t.length > 0 ? t : undefined;
+}
+
+function firstDefined (...values: Array<string | undefined>): string | undefined {
+    return values.find((v) => typeof v === 'string' && v.length > 0);
+}
+
+function base64UrlEncode (value: string): string {
+    return Buffer.from(value, 'utf8').toString('base64url');
+}
+
+function parseJwtPayload (token: string): JwtPayload | null {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+        return null;
+    }
+    try {
+        const decoded = Buffer.from(parts[1], 'base64url').toString('utf8');
+        const payload = JSON.parse(decoded) as Partial<JwtPayload>;
+        if (
+            typeof payload.sub !== 'string'
+            || (payload.role !== 'PetAdmin' && payload.role !== 'PetUser' && payload.role !== 'PetAccountant')
+            || typeof payload.exp !== 'number'
+            || typeof payload.iat !== 'number'
+        ) {
+            return null;
+        }
+        return payload as JwtPayload;
+    } catch {
+        return null;
+    }
+}
+
+function signJwt (payload: JwtPayload, secret: string): string {
+    const header = base64UrlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+    const body = base64UrlEncode(JSON.stringify(payload));
+    const signature = createHmac('sha256', secret).update(`${header}.${body}`).digest('base64url');
+    return `${header}.${body}.${signature}`;
+}
+
+function verifyJwt (token: string, secret: string): JwtPayload | null {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+        return null;
+    }
+    const expectedSig = createHmac('sha256', secret).update(`${parts[0]}.${parts[1]}`).digest('base64url');
+    if (expectedSig !== parts[2]) {
+        return null;
+    }
+    const payload = parseJwtPayload(token);
+    if (!payload) {
+        return null;
+    }
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (payload.exp <= nowSec) {
+        return null;
+    }
+    return payload;
+}
+
+const LEGACY_TOKENS: Record<string, { sub: string; role: PetRole }> = {
+    'pet-e2e-access-token': { sub: 'e2e-admin', role: 'PetAdmin' },
+};
+
 /**
  * Dev / preview middleware: POST /api/graphql echoes JSON the Playwright Reports POM expects
  * (JSON body, not multipart, so request capture can parse GraphQL).
@@ -110,6 +188,107 @@ function petApiMiddleware () {
         return { base: m[1], id: m[2] };
     };
 
+    const jwtSecret = normalizeEnvValue(process.env.PET_JWT_SECRET) ?? 'pet-dev-jwt-secret';
+    const jwtTtlSec = Number(normalizeEnvValue(process.env.PET_JWT_TTL_SEC) ?? '28800');
+
+    const credentials: Array<{ identifier: string; password: string; role: PetRole }> = [
+        {
+            identifier: firstDefined(
+                normalizeEnvValue(process.env.VITE_PET_USER),
+                normalizeEnvValue(process.env.LOGISTICS_UI_USER_NAME),
+                normalizeEnvValue(process.env.LOGISTICS_E2E_USER_NAME)
+            ) ?? 'pet.user@example.com',
+            password: firstDefined(
+                normalizeEnvValue(process.env.VITE_PET_PASSWORD),
+                normalizeEnvValue(process.env.LOGISTICS_PASSWORD)
+            ) ?? 'PetUser123!',
+            role: 'PetUser',
+        },
+        {
+            identifier: firstDefined(
+                normalizeEnvValue(process.env.VITE_PET_ADMIN_USER),
+                normalizeEnvValue(process.env.LOGISTICS_ADMIN_USER_NAME)
+            ) ?? 'pet.admin@example.com',
+            password: firstDefined(
+                normalizeEnvValue(process.env.VITE_PET_ADMIN_PASSWORD),
+                normalizeEnvValue(process.env.LOGISTICS_ADMIN_PASSWORD)
+            ) ?? 'PetAdmin123!',
+            role: 'PetAdmin',
+        },
+        {
+            identifier: firstDefined(
+                normalizeEnvValue(process.env.VITE_PET_ACCOUNTANT_USER),
+                normalizeEnvValue(process.env.LOGISTICS_ACCOUNTANT_USER_NAME)
+            ) ?? 'pet.accountant@example.com',
+            password: firstDefined(
+                normalizeEnvValue(process.env.VITE_PET_ACCOUNTANT_PASSWORD),
+                normalizeEnvValue(process.env.LOGISTICS_ACCOUNTANT_PASSWORD)
+            ) ?? 'PetAccountant123!',
+            role: 'PetAccountant',
+        },
+    ];
+
+    const createAccessToken = (identifier: string, role: PetRole): string => {
+        const nowSec = Math.floor(Date.now() / 1000);
+        return signJwt(
+            {
+                sub: identifier,
+                role,
+                iat: nowSec,
+                exp: nowSec + Math.max(300, jwtTtlSec),
+            },
+            jwtSecret
+        );
+    };
+
+    const getBearerToken = (req: IncomingMessage): string | null => {
+        const authHeader = req.headers.authorization;
+        if (typeof authHeader !== 'string') {
+            return null;
+        }
+        const m = authHeader.match(/^Bearer\s+(.+)$/i);
+        return m?.[1] ?? null;
+    };
+
+    const requireAuth = (req: IncomingMessage, res: ServerResponse): JwtPayload | null => {
+        const token = getBearerToken(req);
+        if (!token) {
+            sendJson(res, 401, { error: 'Missing bearer token' });
+            return null;
+        }
+        const payload = verifyJwt(token, jwtSecret);
+        if (!payload && LEGACY_TOKENS[token]) {
+            const nowSec = Math.floor(Date.now() / 1000);
+            return {
+                sub: LEGACY_TOKENS[token].sub,
+                role: LEGACY_TOKENS[token].role,
+                iat: nowSec,
+                exp: nowSec + 3600,
+            };
+        }
+        if (!payload) {
+            sendJson(res, 401, { error: 'Invalid or expired token' });
+            return null;
+        }
+        return payload;
+    };
+
+    const requireRole = (
+        req: IncomingMessage,
+        res: ServerResponse,
+        roles: readonly PetRole[]
+    ): JwtPayload | null => {
+        const payload = requireAuth(req, res);
+        if (!payload) {
+            return null;
+        }
+        if (!roles.includes(payload.role)) {
+            sendJson(res, 403, { error: 'Forbidden' });
+            return null;
+        }
+        return payload;
+    };
+
     return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
         const urlRaw = req.url ?? '';
         if (!urlRaw.startsWith('/api')) {
@@ -120,7 +299,26 @@ function petApiMiddleware () {
         const url = new URL(urlRaw, 'http://localhost');
         const pathname = url.pathname;
 
+        if (pathname === '/api/auth/login' && req.method === 'POST') {
+            void readJson<{ identifier?: string; password?: string }>(req).then((body) => {
+                const identifier = typeof body?.identifier === 'string' ? body.identifier.trim() : '';
+                const password = typeof body?.password === 'string' ? body.password.trim() : '';
+                const matched = credentials.find((cred) => cred.identifier === identifier && cred.password === password);
+                if (!matched) {
+                    return sendJson(res, 401, { error: 'Invalid credentials' });
+                }
+                return sendJson(res, 200, {
+                    accessToken: createAccessToken(matched.identifier, matched.role),
+                    role: matched.role,
+                });
+            });
+            return;
+        }
+
         if (pathname === '/api/graphql' && req.method === 'POST') {
+            if (!requireRole(req, res, ['PetAdmin', 'PetAccountant'])) {
+                return;
+            }
             void readJson(req).then(() => {
                 sendJson(res, 200, {
                     data: { reportEmailQueued: true },
@@ -147,6 +345,18 @@ function petApiMiddleware () {
         const entity = routeEntity(pathname);
         if (!entity) {
             sendJson(res, 404, { error: 'Not found' });
+            return;
+        }
+        const authPayload = requireAuth(req, res);
+        if (!authPayload) {
+            return;
+        }
+        if (entity.base === 'pet-movers' && authPayload.role !== 'PetAdmin') {
+            sendJson(res, 403, { error: 'PetMovers requires PetAdmin role' });
+            return;
+        }
+        if (entity.base !== 'pet-movers' && authPayload.role === 'PetAccountant') {
+            sendJson(res, 403, { error: 'PetAccountant role is read-only for reports only' });
             return;
         }
 

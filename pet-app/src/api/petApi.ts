@@ -6,16 +6,19 @@ import type {
     PointRecord,
 } from '../types/petLogistics';
 import type { PetMoverRow } from '../petMoversStorage';
+import { getAuthSession } from '../auth';
 
 type ApiErrorPayload = {
     error?: string;
 };
 
 async function requestJson<T> (path: string, init?: RequestInit): Promise<T> {
+    const token = getAuthSession()?.accessToken;
     const response = await fetch(`/api${path}`, {
         ...init,
         headers: {
             'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             ...(init?.headers ?? {}),
         },
     });
@@ -28,7 +31,18 @@ async function requestJson<T> (path: string, init?: RequestInit): Promise<T> {
     return json as T;
 }
 
+type LoginResponse = {
+    accessToken: string;
+    role: 'PetAdmin' | 'PetUser' | 'PetAccountant';
+};
+
 export const petApi = {
+    auth: {
+        login: (identifier: string, password: string) => requestJson<LoginResponse>('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ identifier, password }),
+        }),
+    },
     points: {
         list: () => requestJson<PointRecord[]>('/points'),
         create: (row: Omit<PointRecord, 'id'> & { id?: string }) => requestJson<PointRecord>('/points', {

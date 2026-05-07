@@ -3,75 +3,26 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { BrandLogo } from '../components/BrandLogo';
 import { BRAND_NAME } from '../brand';
 import { petTheme } from '../theme/palette';
-import { ROLE_PET_ACCOUNTANT, ROLE_PET_ADMIN, ROLE_PET_USER } from '../auth';
-
-/** CI/Docker build-args and GitHub secrets often carry trailing spaces or newlines; E2E config trims the same way. */
-function petStubEnv (v: unknown): string | undefined {
-    if (typeof v !== 'string') {
-        return undefined;
-    }
-    const t = v.trim();
-
-    return t.length > 0 ? t : undefined;
-}
+import { ROLE_PET_ACCOUNTANT, setAuthSession } from '../auth';
+import { petApi } from '../api/petApi';
 
 export function LoginPage (): JSX.Element {
     const navigate = useNavigate();
     const location = useLocation();
     const { message } = App.useApp();
     const [form] = Form.useForm<{ identifier: string; password: string }>();
-    const user = petStubEnv(import.meta.env.VITE_PET_USER);
-    const pass = petStubEnv(import.meta.env.VITE_PET_PASSWORD);
-    const adminUser = petStubEnv(import.meta.env.VITE_PET_ADMIN_USER);
-    const adminPass = petStubEnv(import.meta.env.VITE_PET_ADMIN_PASSWORD);
-    const accountantUser = petStubEnv(import.meta.env.VITE_PET_ACCOUNTANT_USER);
-    const accountantPass = petStubEnv(import.meta.env.VITE_PET_ACCOUNTANT_PASSWORD);
-
-    const hasDemoCredentials =
-        Boolean(user && pass)
-        || Boolean(adminUser && adminPass)
-        || Boolean(accountantUser && accountantPass);
-
-    const onFinish = (values: { identifier: string; password: string }): void => {
+    const onFinish = async (values: { identifier: string; password: string }): Promise<void> => {
         const identifier = values.identifier.trim();
         const password = typeof values.password === 'string' ? values.password.trim() : '';
-
-        let role = ROLE_PET_USER;
-        if (
-            adminUser &&
-            adminPass &&
-            identifier === adminUser &&
-            password === adminPass
-        ) {
-            role = ROLE_PET_ADMIN;
-        } else if (
-            accountantUser &&
-            accountantPass &&
-            identifier === accountantUser &&
-            password === accountantPass
-        ) {
-            role = ROLE_PET_ACCOUNTANT;
-        } else if (identifier === user && password === pass) {
-            role = ROLE_PET_USER;
-        } else {
-            if (!hasDemoCredentials) {
-                message.error(
-                    'Login is not configured. Copy pet-app/.env.example to pet-app/.env and restart Vite.'
-                );
-            } else {
-                message.error('Invalid email or password.');
-            }
-
+        let role: string;
+        try {
+            const session = await petApi.auth.login(identifier, password);
+            setAuthSession(session);
+            role = session.role;
+        } catch {
+            message.error('Invalid email or password.');
             return;
         }
-
-        localStorage.setItem(
-            'pet-auth',
-            JSON.stringify({
-                accessToken: 'pet-demo-access-token',
-                role,
-            })
-        );
         const defaultPath = role === ROLE_PET_ACCOUNTANT ? '/reports' : '/home';
         const fromState = location.state as { from?: { pathname?: string; search?: string } } | null | undefined;
         const fromPath = fromState?.from?.pathname;
