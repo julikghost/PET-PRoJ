@@ -5,9 +5,6 @@ import { test, expect } from '@playwright/test';
 import type { Page, Locator } from '@playwright/test';
 import { petMovers as petMoversText } from '../utils/text';
 
-/** Same key as `pet-app/src/petMoversStorage.ts`. */
-const PET_MOVERS_STORAGE_KEY = 'pet-movers-v1';
-
 export class PetMovers {
     readonly page: Page;
     readonly root: Locator;
@@ -50,20 +47,20 @@ export class PetMovers {
             await this.saveModal();
             await expect(this.page.getByText(petMoversText.toastCreated).first()).toBeVisible();
             const id = await this.page.evaluate(
-                ({ key, code }: { key: string; code: string }) => {
-                    const raw = localStorage.getItem(key);
-                    if (!raw) {
+                async ({ code }: { code: string }) => {
+                    const res = await fetch('/api/pet-movers');
+                    if (!res.ok) {
                         return '';
                     }
-                    const rows = JSON.parse(raw) as { id: string; code: string }[];
+                    const rows = await res.json() as { id: string; code: string }[];
                     const row = rows.find((r) => r.code === code);
 
                     return row?.id ?? '';
                 },
-                { key: PET_MOVERS_STORAGE_KEY, code: values.code }
+                { code: values.code }
             );
             if (!id) {
-                throw new Error(`PetMover id not found in localStorage for code "${values.code}"`);
+                throw new Error(`PetMover id not found in API for code "${values.code}"`);
             }
 
             return { id, label: `${values.name} (${values.code})` };
