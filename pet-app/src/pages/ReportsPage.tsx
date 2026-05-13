@@ -5,6 +5,7 @@ import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import { REPORT_CURRENCY_OPTIONS, REPORT_PAYMENT_OPTIONS } from '../data/reportsAndBookingOptions';
 import { petMoverSelectOptions, usePetMovers } from '../petMoversStorage';
+import { getAuthSession } from '../auth';
 
 const { RangePicker } = DatePicker;
 
@@ -136,10 +137,14 @@ export function ReportsPage (): JSX.Element {
                                         },
                                     },
                                 };
+                                const token = getAuthSession()?.accessToken;
 
                                 const res = await fetch(`${API_BASE}/graphql`, {
                                     method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                                    },
                                     body: JSON.stringify(body),
                                 });
                                 if (!res.ok) {

@@ -197,33 +197,33 @@ function petApiMiddleware () {
                 normalizeEnvValue(process.env.VITE_PET_USER),
                 normalizeEnvValue(process.env.LOGISTICS_UI_USER_NAME),
                 normalizeEnvValue(process.env.LOGISTICS_E2E_USER_NAME)
-            ) ?? 'pet.user@example.com',
+            ) ?? 'pet@example.com',
             password: firstDefined(
                 normalizeEnvValue(process.env.VITE_PET_PASSWORD),
                 normalizeEnvValue(process.env.LOGISTICS_PASSWORD)
-            ) ?? 'PetUser123!',
+            ) ?? 'pet-secret',
             role: 'PetUser',
         },
         {
             identifier: firstDefined(
                 normalizeEnvValue(process.env.VITE_PET_ADMIN_USER),
                 normalizeEnvValue(process.env.LOGISTICS_ADMIN_USER_NAME)
-            ) ?? 'pet.admin@example.com',
+            ) ?? 'pet-admin@example.com',
             password: firstDefined(
                 normalizeEnvValue(process.env.VITE_PET_ADMIN_PASSWORD),
                 normalizeEnvValue(process.env.LOGISTICS_ADMIN_PASSWORD)
-            ) ?? 'PetAdmin123!',
+            ) ?? 'pet-admin-secret',
             role: 'PetAdmin',
         },
         {
             identifier: firstDefined(
                 normalizeEnvValue(process.env.VITE_PET_ACCOUNTANT_USER),
                 normalizeEnvValue(process.env.LOGISTICS_ACCOUNTANT_USER_NAME)
-            ) ?? 'pet.accountant@example.com',
+            ) ?? 'pet-accountant@example.com',
             password: firstDefined(
                 normalizeEnvValue(process.env.VITE_PET_ACCOUNTANT_PASSWORD),
                 normalizeEnvValue(process.env.LOGISTICS_ACCOUNTANT_PASSWORD)
-            ) ?? 'PetAccountant123!',
+            ) ?? 'pet-accountant-secret',
             role: 'PetAccountant',
         },
     ];
@@ -352,8 +352,12 @@ function petApiMiddleware () {
             return;
         }
         if (entity.base === 'pet-movers' && authPayload.role !== 'PetAdmin') {
-            sendJson(res, 403, { error: 'PetMovers requires PetAdmin role' });
-            return;
+            const canAccountantReadPetMovers =
+                authPayload.role === 'PetAccountant' && req.method === 'GET' && !entity.id;
+            if (!canAccountantReadPetMovers) {
+                sendJson(res, 403, { error: 'PetMovers requires PetAdmin role' });
+                return;
+            }
         }
         if (entity.base !== 'pet-movers' && authPayload.role === 'PetAccountant') {
             sendJson(res, 403, { error: 'PetAccountant role is read-only for reports only' });
