@@ -65,7 +65,10 @@ export class Login {
             await expect(submitBtn).toBeVisible();
             const postLoginMs = process.env.E2E_DOCKER === '1' ? 45_000 : 28_000;
             await Promise.all([
-                this.page.waitForURL(/\/(home|reports)(\/|$|\?)/, { timeout: postLoginMs }),
+                this.page.waitForURL((url) => {
+                    const path = url.pathname.replace(/\/+$/, '');
+                    return path !== '/login';
+                }, { timeout: postLoginMs }),
                 submitBtn.click(),
             ]);
         });

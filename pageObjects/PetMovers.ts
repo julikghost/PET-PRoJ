@@ -48,7 +48,18 @@ export class PetMovers {
             await expect(this.page.getByText(petMoversText.toastCreated).first()).toBeVisible();
             const id = await this.page.evaluate(
                 async ({ code }: { code: string }) => {
-                    const res = await fetch('/api/pet-movers');
+                    const raw = localStorage.getItem('pet-auth');
+                    const token = (() => {
+                        try {
+                            const parsed = raw ? JSON.parse(raw) as { accessToken?: string } : null;
+                            return typeof parsed?.accessToken === 'string' ? parsed.accessToken : '';
+                        } catch {
+                            return '';
+                        }
+                    })();
+                    const res = await fetch('/api/pet-movers', {
+                        headers: token ? { Authorization: `Bearer ${token}` } : {},
+                    });
                     if (!res.ok) {
                         return '';
                     }

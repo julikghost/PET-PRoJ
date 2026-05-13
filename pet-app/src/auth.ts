@@ -13,8 +13,10 @@ export type PetAuthSession = {
     role: PetRole;
 };
 
+const AUTH_STORAGE_KEY = 'pet-auth';
+
 export function getAuthSession (): PetAuthSession | null {
-    const raw = localStorage.getItem('pet-auth');
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
     if (!raw) {
         return null;
     }
@@ -46,5 +48,9 @@ export function isPetAccountant (): boolean {
 
 /** Clear PET session (localStorage). Call before navigating to `/login`. */
 export function signOut (): void {
-    localStorage.removeItem('pet-auth');
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+}
+
+export function setAuthSession (session: PetAuthSession): void {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
 }
